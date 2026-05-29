@@ -1,11 +1,21 @@
 import { useState, useCallback } from "react";
-import {
-  fetchQuestion,
-  evaluateAnswer,
-  fetchFollowUp,
-  fetchSessionSummary,
-} from "../utils/api";
-import { TOTAL_QUESTIONS } from "../utils/prompts";
+import { loadSettings } from "../utils/storage"; // V3: read questionCount + provider
+
+// ── V3: Dynamic API provider switching based on Settings ─────────────────────
+// Reads the saved provider from localStorage at hook init time.
+// To add a new provider: add its key to storage.js DEFAULT_SETTINGS
+//   and create a matching api-<provider>.js in utils/
+function getApiModule() {
+  const provider = loadSettings().provider || "gemini";
+  switch (provider) {
+    case "gemini":
+      return import("../utils/api.js");
+    case "openai":
+      return import("../utils/api-openai.js");
+    default:
+      return import("../utils/api-claude.js");
+  }
+}
 
 // States: idle | loading-question | answering | evaluating | feedback
 //         followup-loading | followup-answering | followup-evaluating | followup-feedback
@@ -27,10 +37,13 @@ export default function useInterview(config) {
   const [followUpAnswer, setFollowUpAnswer] = useState("");
   const [followUpFeedback, setFollowUpFeedback] = useState(null);
 
-  // V2: retry counter (so UI knows how many retries happened)
+  // V2: retry counter
   const [retryCount, setRetryCount] = useState(0);
 
   const { role, type, difficulty, jobDescription } = config;
+
+  // V3: dynamic question count from Settings (fallback 5)
+  const totalQuestions = loadSettings().questionCount || 5;
 
   // ── Load next question ──────────────────────────────────────────────────────
   const loadQuestion = useCallback(
@@ -47,6 +60,7 @@ export default function useInterview(config) {
       setState("loading-question");
 
       try {
+        const { fetchQuestion } = await getApiModule();
         const previousQuestions = sessionsSoFar.map((s) => s.question);
         const q = await fetchQuestion(
           role,
@@ -79,6 +93,7 @@ export default function useInterview(config) {
     setError(null);
     setState("evaluating");
     try {
+      const { evaluateAnswer } = await getApiModule();
       const fb = await evaluateAnswer(
         currentQ.question,
         answer,
@@ -113,6 +128,7 @@ export default function useInterview(config) {
     setError(null);
     setState("followup-loading");
     try {
+      const { fetchFollowUp } = await getApiModule();
       const result = await fetchFollowUp(
         currentQ.question,
         answer,
@@ -134,6 +150,7 @@ export default function useInterview(config) {
     setError(null);
     setState("followup-evaluating");
     try {
+      const { evaluateAnswer } = await getApiModule();
       const fb = await evaluateAnswer(
         followUpQ.followUp,
         followUpAnswer,
@@ -164,9 +181,11 @@ export default function useInterview(config) {
     const updatedSessions = [...sessions, newSession];
     setSessions(updatedSessions);
 
-    if (updatedSessions.length >= TOTAL_QUESTIONS) {
+    if (updatedSessions.length >= totalQuestions) {
+      // V3: was TOTAL_QUESTIONS
       setState("loading-question");
       try {
+        const { fetchSessionSummary } = await getApiModule();
         const s = await fetchSessionSummary(
           updatedSessions,
           role,
@@ -176,7 +195,9 @@ export default function useInterview(config) {
         setSummary(s);
         setState("done");
       } catch (e) {
+        // V3: navigate forward even if summary generation fails
         setError(e.message || "Failed to generate summary.");
+        setSummary(null);
         setState("done");
       }
     } else {
@@ -196,6 +217,7 @@ export default function useInterview(config) {
     type,
     difficulty,
     loadQuestion,
+    totalQuestions,
   ]);
 
   const isFeedbackState = [
@@ -207,7 +229,6 @@ export default function useInterview(config) {
   ].includes(state);
 
   return {
-    // State
     state,
     currentQ,
     qIndex,
@@ -222,19 +243,17 @@ export default function useInterview(config) {
     showImproved,
     setShowImproved,
     retryCount,
-    // V2 follow-up
     followUpQ,
     followUpAnswer,
     setFollowUpAnswer,
     followUpFeedback,
     isFeedbackState,
-    // Actions
     startInterview,
     submitAnswer,
     retryQuestion,
     loadFollowUp,
     submitFollowUp,
     nextQuestion,
-    totalQuestions: TOTAL_QUESTIONS,
+    totalQuestions, // V3: dynamic from settings
   };
 }
