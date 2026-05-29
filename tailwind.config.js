@@ -4,20 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: "#07080F",
-        surface: "#0C0D1A",
-        card: "#111223",
-        border: "#1C1E30",
-        "border-light": "#252840",
+        bg: "var(--color-bg)",
+        surface: "var(--color-surface)",
+        card: "var(--color-card)",
+        border: "var(--color-border)",
+        "border-light": "var(--color-border-light)",
+        text: "var(--color-text)",
+        muted: "var(--color-muted)",
+        subtle: "var(--color-subtle)",
+
         accent: "#00C2FF",
         "accent-dim": "#0099CC",
         gold: "#FFB800",
         success: "#00E676",
         danger: "#FF4D6A",
         warn: "#FF9800",
-        text: "#EDF0FF",
-        muted: "#5A6080",
-        subtle: "#2A2D45",
       },
       fontFamily: {
         display: ['"Bricolage Grotesque"', "sans-serif"],
