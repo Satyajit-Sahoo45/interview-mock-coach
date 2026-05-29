@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   loadAllSessions,
   deleteSession,
@@ -10,17 +10,25 @@ import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import ScoreRing from "./ui/ScoreRing";
 import { ROLES, INTERVIEW_TYPES } from "../utils/prompts";
+import ProgressBar from "./ui/ProgressBar";
+import { useToast } from "./ui/Toast";
 
 export default function History({ onBack }) {
   const [sessions, setSessions] = useState(() => loadAllSessions());
   const [expanded, setExpanded] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
   const stats = computeStats();
+
+  const toast = useToast();
 
   const handleDelete = (id) => {
     deleteSession(id);
     setSessions(loadAllSessions());
     if (expanded === id) setExpanded(null);
+    // ← V3: ADD toast feedback
+    toast.info("Session deleted.");
   };
 
   const handleClearAll = () => {
@@ -28,7 +36,32 @@ export default function History({ onBack }) {
     setSessions([]);
     setConfirmClear(false);
     setExpanded(null);
+    // ← V3: ADD toast feedback
+    toast.info("All sessions cleared.");
   };
+
+  // ── V3: ADD filtered + sorted sessions ──────────────────────────────────────
+  // Place this block RIGHT BEFORE the return statement
+  const filteredSessions = useMemo(() => {
+    const filtered = sessions.filter(
+      (s) => filter === "all" || s.config?.type === filter,
+    );
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "newest") return b.id - a.id;
+      if (sortBy === "oldest") return a.id - b.id;
+      if (sortBy === "highest")
+        return (
+          Number(b.summary?.overallScore || 0) -
+          Number(a.summary?.overallScore || 0)
+        );
+      if (sortBy === "lowest")
+        return (
+          Number(a.summary?.overallScore || 0) -
+          Number(b.summary?.overallScore || 0)
+        );
+      return 0;
+    });
+  }, [sessions, filter, sortBy]);
 
   const roleLabel = (id) => ROLES.find((r) => r.id === id)?.label || id;
   const typeLabel = (id) =>
@@ -71,8 +104,8 @@ export default function History({ onBack }) {
               Session <span className="text-gradient-gold">History</span>
             </h1>
             <p className="text-muted text-sm mt-1">
-              {sessions.length} session{sessions.length !== 1 ? "s" : ""}{" "}
-              recorded
+              {filteredSessions.length} of {sessions.length} session
+              {sessions.length !== 1 ? "s" : ""} recorded
             </p>
           </div>
           {sessions.length > 0 && (
@@ -162,6 +195,54 @@ export default function History({ onBack }) {
           </Card>
         )}
 
+        {/* ── V3: Filter + Sort Bar ────────────────────────────────────────────
+            ADD this entire block — it's new in V3               ────────────── */}
+        {sessions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 mb-5 animate-fade-in">
+            {/* Filter by type */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-muted">Filter:</span>
+              <div className="flex gap-1">
+                {[
+                  { id: "all", label: "All" },
+                  { id: "behavioral", label: "Behavioral" },
+                  { id: "technical", label: "Technical" },
+                  { id: "hr", label: "HR" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setFilter(f.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer
+                      ${
+                        filter === f.id
+                          ? "bg-accent/20 text-accent border border-accent/30"
+                          : "text-muted border border-border hover:text-text"
+                      }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs font-mono text-muted">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="text-xs font-mono bg-card border border-border rounded-lg
+                  px-2 py-1 text-text outline-none focus:border-accent cursor-pointer"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="highest">Highest score</option>
+                <option value="lowest">Lowest score</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* ── Empty State ── */}
         {sessions.length === 0 && (
           <Card className="p-16 text-center animate-fade-in">
@@ -178,9 +259,22 @@ export default function History({ onBack }) {
           </Card>
         )}
 
+        {/* ── No results after filter ── */}
+        {sessions.length > 0 && filteredSessions.length === 0 && (
+          <Card className="p-10 text-center animate-fade-in">
+            <p className="text-muted text-sm">No sessions match this filter.</p>
+            <button
+              onClick={() => setFilter("all")}
+              className="text-accent text-xs font-mono mt-2 hover:underline"
+            >
+              Clear filter
+            </button>
+          </Card>
+        )}
+
         {/* ── Session List ── */}
         <div className="space-y-3 animate-slide-up stagger-3">
-          {sessions.map((session) => {
+          {filteredSessions.map((session) => {
             const isOpen = expanded === session.id;
             const score = Number(session.summary?.overallScore || 0);
             const rating = session.summary?.overallRating || "—";
@@ -229,6 +323,23 @@ export default function History({ onBack }) {
                       {date} at {time} · {session.sessions?.length || 0}{" "}
                       questions
                     </div>
+                    {/* ← V3: ADD inline score progress bar */}
+                    {score > 0 && (
+                      <ProgressBar
+                        value={score * 10}
+                        color={
+                          score >= 8
+                            ? "success"
+                            : score >= 6
+                              ? "accent"
+                              : score >= 4
+                                ? "warn"
+                                : "danger"
+                        }
+                        height="h-0.5"
+                        className="mt-2 max-w-[160px]"
+                      />
+                    )}
                   </div>
 
                   <span className="text-muted text-xs shrink-0">
@@ -308,16 +419,35 @@ export default function History({ onBack }) {
                               {q.feedback?.score ?? "—"}/10
                             </span>
                           </div>
-                          {q.retryCount > 0 && (
-                            <div className="text-xs font-mono text-muted mt-1">
-                              🔄 Retried {q.retryCount}×
-                            </div>
+                          {/* ← V3: ADD per-question progress bar */}
+                          {q.feedback?.score > 0 && (
+                            <ProgressBar
+                              value={(q.feedback.score / 10) * 100}
+                              color={
+                                q.feedback.score >= 8
+                                  ? "success"
+                                  : q.feedback.score >= 6
+                                    ? "accent"
+                                    : q.feedback.score >= 4
+                                      ? "warn"
+                                      : "danger"
+                              }
+                              height="h-0.5"
+                              className="mt-2"
+                            />
                           )}
-                          {q.followUpQ && (
-                            <div className="text-xs font-mono text-accent/70 mt-1">
-                              💬 Follow-up asked
-                            </div>
-                          )}
+                          <div className="flex gap-2 mt-1">
+                            {q.retryCount > 0 && (
+                              <span className="text-xs font-mono text-muted">
+                                🔄 Retried {q.retryCount}×
+                              </span>
+                            )}
+                            {q.followUpQ && (
+                              <span className="text-xs font-mono text-accent/70">
+                                💬 Follow-up asked
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

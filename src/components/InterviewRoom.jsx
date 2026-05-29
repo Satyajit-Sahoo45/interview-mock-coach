@@ -7,9 +7,14 @@ import DotLoader from "./ui/DotLoader";
 import ScoreRing from "./ui/ScoreRing";
 import VoiceRecorder from "./ui/VoiceRecorder";
 import { ROLES, INTERVIEW_TYPES } from "../utils/prompts";
+import { useToast } from "./ui/Toast";
+import { loadSettings } from "../utils/storage";
+import ProgressBar from "./ui/Progressbar";
 
 export default function InterviewRoom({ config, onComplete, onExit }) {
   const iv = useInterview(config);
+  const toast = useToast();
+  const settings = loadSettings();
 
   useEffect(() => {
     iv.startInterview();
@@ -21,11 +26,23 @@ export default function InterviewRoom({ config, onComplete, onExit }) {
     }
   }, [iv.state, iv.summary]);
 
+  // Toast on feedback received
+  useEffect(() => {
+    if (iv.state === "feedback" && iv.feedback) {
+      const s = iv.feedback.score;
+      if (s >= 9) toast.success("🔥 Outstanding answer!");
+      else if (s >= 7) toast.success("✓ Great answer!");
+      else if (s >= 5) toast.info("📝 Decent — check the gaps below.");
+      else toast.warn("⚠️ Needs work — see feedback below.");
+    }
+  }, [iv.state]);
+
   const roleLabel =
     ROLES.find((r) => r.id === config.role)?.label || config.role;
   const typeLabel =
     INTERVIEW_TYPES.find((t) => t.id === config.type)?.label || config.type;
   const progress = (iv.qIndex / iv.totalQuestions) * 100;
+  const canSubmit = iv.answer.trim().length >= 10;
 
   return (
     <div className="min-h-screen bg-grid relative">
@@ -56,12 +73,12 @@ export default function InterviewRoom({ config, onComplete, onExit }) {
         </header>
 
         {/* ── Progress Bar ── */}
-        <div className="w-full h-1 bg-border rounded-full mb-8 overflow-hidden">
-          <div
-            className="h-full bg-accent rounded-full transition-all duration-700"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={progress}
+          color="accent"
+          height="h-1"
+          className="mb-8"
+        />
 
         {/* ── Error ── */}
         {iv.error && (
@@ -266,8 +283,11 @@ function AnswerBlock({ label, value, onChange, disabled, onVoiceTranscript }) {
         <span className="text-xs font-mono text-muted">{wordCount} words</span>
         {wordCount < 30 && !disabled && (
           <span className="text-xs font-mono text-warn">
-            Aim for at least 30 words
+            Aim for ≥ 30 words
           </span>
+        )}
+        {wordCount >= 30 && !disabled && (
+          <span className="text-xs font-mono text-success">✓ Good length</span>
         )}
       </div>
     </div>

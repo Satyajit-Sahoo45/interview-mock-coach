@@ -1,4 +1,5 @@
-const KEY = "interviewai_sessions";
+const SESSION_KEY = "interviewai_sessions";
+const SETTINGS_KEY = "interviewai_settings";
 
 /**
  * Save a completed session with full data.
@@ -15,7 +16,7 @@ export function saveSession({ config, sessions, summary }) {
     };
     all.unshift(entry);
     // Keep last 30 sessions
-    localStorage.setItem(KEY, JSON.stringify(all.slice(0, 30)));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(all.slice(0, 30)));
     return entry;
   } catch (_) {
     return null;
@@ -27,7 +28,7 @@ export function saveSession({ config, sessions, summary }) {
  */
 export function loadAllSessions() {
   try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]");
+    return JSON.parse(localStorage.getItem(SESSION_KEY) || "[]");
   } catch (_) {
     return [];
   }
@@ -39,7 +40,7 @@ export function loadAllSessions() {
 export function deleteSession(id) {
   try {
     const filtered = loadAllSessions().filter((s) => s.id !== id);
-    localStorage.setItem(KEY, JSON.stringify(filtered));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(filtered));
   } catch (_) {}
 }
 
@@ -75,4 +76,33 @@ export function computeStats() {
   const topRole = Object.entries(roleCount).sort((a, b) => b[1] - a[1])[0]?.[0];
 
   return { total: all.length, avgScore, best, trend, topRole };
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+export const DEFAULT_SETTINGS = {
+  provider: "gemini", // 'gemini' | 'claude' | 'openai'
+  model: "auto", // 'auto' = use provider default
+  questionCount: 5, // 3 | 5 | 7 | 10
+  theme: "dark", // 'dark' | 'light'
+  voiceEnabled: true,
+  autoSave: true,
+  showIdealTopics: true,
+};
+
+export function loadSettings() {
+  try {
+    return {
+      ...DEFAULT_SETTINGS,
+      ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"),
+    };
+  } catch (_) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+export function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch (_) {}
 }
