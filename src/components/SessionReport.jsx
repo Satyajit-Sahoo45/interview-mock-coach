@@ -4,6 +4,9 @@ import Badge from "./ui/Badge";
 import Card from "./ui/Card";
 import ScoreRing from "./ui/ScoreRing";
 import { ROLES, INTERVIEW_TYPES } from "../utils/prompts";
+import { useToast } from "./ui/Toast";
+import ProgressBar from "./ui/ProgressBar";
+import Confetti from "./ui/Confetti";
 
 export default function SessionReport({
   sessions,
@@ -13,6 +16,7 @@ export default function SessionReport({
   onHistory,
 }) {
   const [expandedQ, setExpandedQ] = useState(null);
+  const toast = useToast();
 
   const roleLabel =
     ROLES.find((r) => r.id === config?.role)?.label || config?.role || "";
@@ -29,6 +33,8 @@ export default function SessionReport({
           sessions.length
         ).toFixed(1)
       : 0);
+
+  const isGreatScore = avgScore >= 1;
 
   const ratingColor = (r) =>
     r === "Excellent"
@@ -48,8 +54,36 @@ export default function SessionReport({
           ? "text-warn"
           : "text-danger";
 
+  const handleExport = () => {
+    const text = [
+      `🎯 Interview Report — ${roleLabel} | ${typeLabel} | ${config?.difficulty}`,
+      `Overall Score: ${avgScore}/10 — ${summary?.overallRating}`,
+      "",
+      ...sessions.map((s, i) =>
+        [
+          `Q${i + 1}: ${s.question}`,
+          `Answer: ${s.answer}`,
+          `Score: ${s.feedback?.score}/10`,
+          s.followUpQ ? `Follow-up: ${s.followUpQ}` : "",
+          "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      ),
+      summary?.motivationalNote ? `\n"${summary.motivationalNote}"` : "",
+    ].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.download = `interview-report-${Date.now()}.txt`;
+    a.click();
+    toast.success("Report downloaded!");
+  };
+
   return (
     <div className="min-h-screen bg-grid relative overflow-hidden">
+      {/* V3: Confetti for great scores */}
+      <Confetti show={isGreatScore} />
+
       <div
         className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-72
         bg-accent/4 blur-[120px] rounded-full"
@@ -89,6 +123,13 @@ export default function SessionReport({
               <div className="font-display text-3xl font-extrabold text-text mb-1">
                 {summary?.overallRating || "Review Complete"}
               </div>
+              {/* V3: progress bar for overall score */}
+              <ProgressBar
+                value={avgScore * 10}
+                color={isGreatScore ? "success" : "accent"}
+                height="h-2"
+                className="mb-3"
+              />
               {summary?.motivationalNote && (
                 <p className="text-muted text-sm leading-relaxed mt-3 italic">
                   "{summary.motivationalNote}"
@@ -279,6 +320,22 @@ export default function SessionReport({
                         </p>
                       </div>
 
+                      {/* V3: score bar per question */}
+                      <ProgressBar
+                        value={score * 10}
+                        color={
+                          score >= 8
+                            ? "success"
+                            : score >= 6
+                              ? "accent"
+                              : score >= 4
+                                ? "warn"
+                                : "danger"
+                        }
+                        height="h-1.5"
+                        showLabel
+                      />
+
                       {/* Feedback */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {s.feedback?.strengths?.length > 0 && (
@@ -382,26 +439,7 @@ export default function SessionReport({
           <Button onClick={onHistory} variant="gold" size="lg">
             📊 View History
           </Button>
-          <Button
-            onClick={() => {
-              const text = sessions
-                .map(
-                  (s, i) =>
-                    `Q${i + 1}: ${s.question}\nAnswer: ${s.answer}\nScore: ${s.feedback?.score}/10\n` +
-                    (s.followUpQ ? `Follow-up: ${s.followUpQ}\n` : ""),
-                )
-                .join("\n");
-              const blob = new Blob([text], { type: "text/plain" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "interview-report.txt";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            variant="ghost"
-            size="lg"
-          >
+          <Button onClick={handleExport} variant="ghost" size="lg">
             ↓ Export
           </Button>
         </div>
