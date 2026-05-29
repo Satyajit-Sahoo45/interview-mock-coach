@@ -13,27 +13,61 @@
     scroll-behavior: smooth;
   }
 
+  /* ── DARK THEME (default) ─────────────────────────────────────────────────
+     All theme-sensitive Tailwind classes (bg-bg, text-text, border-border…)
+     resolve through these CSS variables. Switching to light theme only
+     requires overriding the variables below — no component edits needed.   */
+  :root,
+  [data-theme="dark"] {
+    --color-bg: #07080f;
+    --color-surface: #0c0d1a;
+    --color-card: #111223;
+    --color-border: #1c1e30;
+    --color-border-light: #252840;
+    --color-text: #edf0ff;
+    --color-muted: #5a6080;
+    --color-subtle: #2a2d45;
+  }
+
+  /* ── LIGHT THEME ──────────────────────────────────────────────────────────
+     Applied when Settings saves theme="light" and calls:
+       document.documentElement.setAttribute('data-theme', 'light')         */
+  [data-theme="light"] {
+    --color-bg: #f0f2f8;
+    --color-surface: #ffffff;
+    --color-card: #ffffff;
+    --color-border: #dde1f0;
+    --color-border-light: #c8cedf;
+    --color-text: #0d1117;
+    --color-muted: #6b7796;
+    --color-subtle: #e8ebf5;
+  }
+
   body {
-    background-color: #07080f;
-    color: #edf0ff;
+    background-color: var(--color-bg);
+    color: var(--color-text);
     font-family: "Plus Jakarta Sans", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Smooth background transition when toggling theme */
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
-  /* Custom scrollbar */
+  /* Scrollbar — adapts to theme */
   ::-webkit-scrollbar {
     width: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #07080f;
+    background: var(--color-bg);
   }
   ::-webkit-scrollbar-thumb {
-    background: #1c1e30;
+    background: var(--color-border);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #252840;
+    background: var(--color-border-light);
   }
 
   textarea {
@@ -42,44 +76,88 @@
 
   ::selection {
     background: rgba(0, 194, 255, 0.25);
-    color: #edf0ff;
+    color: var(--color-text);
+  }
+
+  /* Select element */
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235A6080' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px !important;
+  }
+
+  /* Keyboard shortcut chip */
+  kbd {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    line-height: 1;
   }
 }
 
 @layer components {
-  /* Grid background pattern */
+  /* ── Grid background ──────────────────────────────────────────────────── */
   .bg-grid {
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      linear-gradient(rgba(128, 128, 128, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(128, 128, 128, 0.06) 1px, transparent 1px);
     background-size: 48px 48px;
   }
 
-  /* Glow effects */
+  /* In light mode the grid needs a slightly more visible tint */
+  [data-theme="light"] .bg-grid {
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  }
+
+  /* ── Glow effects ─────────────────────────────────────────────────────── */
   .glow-accent {
     box-shadow:
       0 0 30px rgba(0, 194, 255, 0.15),
       0 0 60px rgba(0, 194, 255, 0.05);
   }
-
   .glow-gold {
     box-shadow:
       0 0 30px rgba(255, 184, 0, 0.2),
       0 0 60px rgba(255, 184, 0, 0.08);
   }
-
   .glow-success {
     box-shadow: 0 0 30px rgba(0, 230, 118, 0.15);
   }
 
-  /* Glass card */
+  /* Glows are more subtle in light mode */
+  [data-theme="light"] .glow-accent {
+    box-shadow: 0 0 20px rgba(0, 194, 255, 0.12);
+  }
+  [data-theme="light"] .glow-gold {
+    box-shadow: 0 0 20px rgba(255, 184, 0, 0.15);
+  }
+  [data-theme="light"] .glow-success {
+    box-shadow: 0 0 20px rgba(0, 230, 118, 0.1);
+  }
+
+  /* ── Glass card ───────────────────────────────────────────────────────── */
   .glass-card {
     background: rgba(17, 18, 35, 0.8);
     backdrop-filter: blur(16px);
-    border: 1px solid #1c1e30;
+    border: 1px solid var(--color-border);
+    transition:
+      background 0.3s ease,
+      border-color 0.3s ease;
   }
 
-  /* Accent text gradient */
+  [data-theme="light"] .glass-card {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.06),
+      0 4px 12px rgba(0, 0, 0, 0.04);
+  }
+
+  /* ── Text gradients ───────────────────────────────────────────────────── */
   .text-gradient-accent {
     background: linear-gradient(135deg, #00c2ff, #7b61ff);
     -webkit-background-clip: text;
@@ -94,7 +172,7 @@
     background-clip: text;
   }
 
-  /* Dot loader */
+  /* ── Dot loader ───────────────────────────────────────────────────────── */
   .dot-loader span {
     display: inline-block;
     width: 6px;
@@ -123,7 +201,7 @@
     }
   }
 
-  /* Score ring animation */
+  /* ── Score ring ───────────────────────────────────────────────────────── */
   @keyframes drawRing {
     from {
       stroke-dashoffset: 440;
@@ -137,7 +215,7 @@
     animation: drawRing 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both;
   }
 
-  /* Fade in stagger */
+  /* ── Animation stagger helpers ────────────────────────────────────────── */
   .stagger-1 {
     animation-delay: 0.1s;
   }
@@ -152,5 +230,90 @@
   }
   .stagger-5 {
     animation-delay: 0.5s;
+  }
+  .stagger-6 {
+    animation-delay: 0.6s;
+  }
+  .stagger-7 {
+    animation-delay: 0.7s;
+  }
+
+  /* ── Toast ────────────────────────────────────────────────────────────── */
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .toast-enter {
+    animation: toastIn 0.25s ease forwards;
+  }
+
+  /* ── Cheat sheet section reveal ───────────────────────────────────────── */
+  @keyframes revealSection {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .reveal-section {
+    animation: revealSection 0.35s ease forwards;
+  }
+
+  /* ── Progress bar pulse ───────────────────────────────────────────────── */
+  @keyframes progressPulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  .progress-pulse {
+    animation: progressPulse 2s ease-in-out infinite;
+  }
+
+  /* ── Page enter ───────────────────────────────────────────────────────── */
+  .page-enter {
+    animation: fadeIn 0.3s ease forwards;
+  }
+
+  /* ── Modal backdrop ───────────────────────────────────────────────────── */
+  .modal-backdrop {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* ── Confetti canvas ──────────────────────────────────────────────────── */
+  canvas.confetti-canvas {
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  .bg-grid {
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .glass-card {
+    background: white !important;
+    border: 1px solid #ddd !important;
   }
 }
