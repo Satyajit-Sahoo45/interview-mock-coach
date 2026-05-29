@@ -169,3 +169,56 @@ Respond ONLY with valid JSON — no markdown, no code fences:
   "motivationalNote": "<A personalised 1–2 sentence encouraging message>"
 }
 `;
+
+// ─── V3 new prompts ───────────────────────────────────────────────────────────
+
+export const buildCheatSheetPrompt = (
+  role,
+  type,
+  difficulty,
+  jobDescription = "",
+) => `
+You are an expert career coach. Generate a concise pre-interview cheat sheet for a candidate
+preparing for a ${difficulty}-level ${type} interview for a ${role} position.
+${jobDescription ? `\nJob context:\n"""\n${jobDescription.slice(0, 600)}\n"""` : ""}
+ 
+Keep every item short and punchy — this is a quick-reference card, not an essay.
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "keyTopics": ["<topic 1>", "<topic 2>", "<topic 3>", "<topic 4>", "<topic 5>"],
+  "starExamples": [
+    { "situation": "<1 sentence>", "task": "<1 sentence>", "action": "<1 sentence>", "result": "<1 sentence>" }
+  ],
+  "commonMistakes": ["<mistake 1>", "<mistake 2>", "<mistake 3>"],
+  "powerPhrases": ["<phrase 1>", "<phrase 2>", "<phrase 3>"],
+  "questionsToAsk": ["<question to ask interviewer 1>", "<question 2>", "<question 3>"]
+}
+`;
+
+export const buildResumeTipsPrompt = (sessions, role, type) => `
+You are an expert resume coach. Based on this mock interview session for a ${role} ${type} position,
+suggest 4 powerful bullet points the candidate should add to their resume, based on the topics
+they demonstrated knowledge of. Make each bullet start with a strong action verb and include
+a quantified impact where possible (use realistic estimates if exact numbers aren't available).
+ 
+Session highlights:
+${sessions
+  .slice(0, 3)
+  .map(
+    (s, i) =>
+      `Q${i + 1}: ${s.question}\nAnswer summary: ${s.answer?.slice(0, 200)}`,
+  )
+  .join("\n\n")}
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "bullets": [
+    "<bullet 1>",
+    "<bullet 2>",
+    "<bullet 3>",
+    "<bullet 4>"
+  ],
+  "tip": "<One sentence coaching tip about resume presentation for this role>"
+}
+`;
