@@ -4,9 +4,10 @@ import Card from "./ui/Card";
 import Tabs from "./ui/Tabs";
 import Modal from "./ui/Modal";
 import { ROLES, INTERVIEW_TYPES, DIFFICULTIES } from "../utils/prompts";
-import { loadAllSessions } from "../utils/storage";
+import { loadAllSessions, loadSettings } from "../utils/storage";
 
-export default function Home({ onStart, onHistory }) {
+export default function Home({ onStart, onHistory, onSettings }) {
+  const settings = loadSettings();
   const [role, setRole] = useState(null);
   const [type, setType] = useState(null);
   const [difficulty, setDifficulty] = useState(null);
@@ -56,6 +57,14 @@ export default function Home({ onStart, onHistory }) {
                 {pastCount}
               </span>
             )}
+          </button>
+          <button
+            onClick={onSettings}
+            className="flex items-center gap-2 text-sm font-mono text-muted hover:text-text
+              transition-colors border border-border hover:border-border-light
+              px-3 py-1.5 rounded-lg bg-card/50"
+          >
+            ⚙️ Settings
           </button>
         </div>
 
