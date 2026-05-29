@@ -3,6 +3,7 @@ import {
   buildEvaluationPrompt,
   buildSummaryPrompt,
   buildFollowUpPrompt,
+  buildCheatSheetPrompt,
 } from "./prompts";
 
 const MODEL = "gemini-3.1-flash-lite"; // swap to 'gemini-1.5-pro' for higher quality
@@ -116,3 +117,6 @@ export async function fetchSessionSummary(sessions, role, type, difficulty) {
   // Returns: { overallScore, overallRating, topStrengths, criticalImprovements,
   //            studyTopics, motivationalNote }
 }
+
+export const fetchCheatSheet = (role, type, diff, jd) =>
+  callGemini(buildCheatSheetPrompt(role, type, diff, jd));
