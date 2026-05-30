@@ -5,6 +5,7 @@ import Tabs from "./ui/Tabs";
 import Modal from "./ui/Modal";
 import { ROLES, INTERVIEW_TYPES, DIFFICULTIES } from "../utils/prompts";
 import { loadAllSessions, loadSettings } from "../utils/storage";
+import { SignInButton, UserButton, SignedIn } from "@clerk/clerk-react";
 
 export default function Home({ onStart, onHistory, onSettings }) {
   const settings = loadSettings();
@@ -44,7 +45,7 @@ export default function Home({ onStart, onHistory, onSettings }) {
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-16">
         {/* ── Top bar ── */}
-        <div className="flex justify-end mb-6 animate-fade-in">
+        <div className="flex justify-end gap-2 mb-6 animate-fade-in">
           <button
             onClick={onHistory}
             className="flex items-center gap-2 text-sm font-mono text-muted
@@ -66,6 +67,9 @@ export default function Home({ onStart, onHistory, onSettings }) {
           >
             ⚙️ Settings
           </button>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
 
         {/* ── Header ── */}
