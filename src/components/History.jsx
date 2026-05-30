@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   loadAllSessions,
   deleteSession,
@@ -12,36 +12,71 @@ import ScoreRing from "./ui/ScoreRing";
 import { ROLES, INTERVIEW_TYPES } from "../utils/prompts";
 import ProgressBar from "./ui/ProgressBar";
 import { useToast } from "./ui/Toast";
+import {
+  loadSessionsFromDB,
+  deleteSessionFromDB,
+  clearAllSessionsFromDB,
+  computeStatsFromRows,
+} from "../utils/db";
+import useDB from "../hooks/useDB";
 
 export default function History({ onBack }) {
+  const { db, userId } = useDB();
   const [sessions, setSessions] = useState(() => loadAllSessions());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
-  const stats = computeStats();
+  // const stats = computeStats();
 
   const toast = useToast();
+  // ── V4: Load from Supabase ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!db || !userId) return;
+    let cancelled = false;
 
-  const handleDelete = (id) => {
-    deleteSession(id);
-    setSessions(loadAllSessions());
-    if (expanded === id) setExpanded(null);
-    // ← V3: ADD toast feedback
-    toast.info("Session deleted.");
-  };
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const rows = await loadSessionsFromDB(db, userId);
+        if (!cancelled) setSessions(rows);
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
-  const handleClearAll = () => {
-    clearAllSessions();
-    setSessions([]);
-    setConfirmClear(false);
-    setExpanded(null);
-    // ← V3: ADD toast feedback
-    toast.info("All sessions cleared.");
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [db, userId]);
+
+  const stats = useMemo(() => computeStatsFromRows(sessions), [sessions]);
+
+  // const handleDelete = (id) => {
+  //   deleteSession(id);
+  //   setSessions(loadAllSessions());
+  //   if (expanded === id) setExpanded(null);
+  //   // ← V3: ADD toast feedback
+  //   toast.info("Session deleted.");
+  // };
+
+  // const handleClearAll = () => {
+  //   clearAllSessions();
+  //   setSessions([]);
+  //   setConfirmClear(false);
+  //   setExpanded(null);
+  //   // ← V3: ADD toast feedback
+  //   toast.info("All sessions cleared.");
+  // };
 
   // ── V3: ADD filtered + sorted sessions ──────────────────────────────────────
   // Place this block RIGHT BEFORE the return statement
+
   const filteredSessions = useMemo(() => {
     const filtered = sessions.filter(
       (s) => filter === "all" || s.config?.type === filter,
@@ -62,6 +97,29 @@ export default function History({ onBack }) {
       return 0;
     });
   }, [sessions, filter, sortBy]);
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteSessionFromDB(db, id);
+      setSessions((s) => s.filter((x) => x.id !== id));
+      if (expanded === id) setExpanded(null);
+      toast.info("Session deleted.");
+    } catch (e) {
+      toast.error("Failed to delete: " + e.message);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await clearAllSessionsFromDB(db, userId);
+      setSessions([]);
+      setConfirmClear(false);
+      setExpanded(null);
+      toast.info("All sessions cleared.");
+    } catch (e) {
+      toast.error("Failed to clear: " + e.message);
+    }
+  };
 
   const roleLabel = (id) => ROLES.find((r) => r.id === id)?.label || id;
   const typeLabel = (id) =>

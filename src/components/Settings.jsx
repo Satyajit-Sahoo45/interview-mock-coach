@@ -4,6 +4,8 @@ import Button from "./ui/Button";
 import Badge from "./ui/Badge";
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from "../utils/storage";
 import { useToast } from "./ui/Toast";
+import useDB from "../hooks/useDB";
+import { saveSettingsToDB } from "../utils/db";
 
 const PROVIDERS = [
   {
@@ -49,6 +51,7 @@ const THEMES = [
 ];
 
 export default function Settings({ onBack }) {
+  const { db, userId } = useDB();
   const toast = useToast();
   const [settings, setSettings] = useState(() => loadSettings());
   const [apiKeys, setApiKeys] = useState(() => ({
@@ -60,28 +63,60 @@ export default function Settings({ onBack }) {
 
   const set = (key, val) => setSettings((s) => ({ ...s, [key]: val }));
 
-  const handleSave = () => {
-    // 1. Persist settings
+  // const handleSave = () => {
+  //   // 1. Persist settings
+  //   saveSettings(settings);
+
+  //   // 2. Save all API keys to localStorage
+  //   PROVIDERS.forEach((p) => {
+  //     if (apiKeys[p.id]) {
+  //       localStorage.setItem(p.keyName, apiKeys[p.id].trim());
+  //     }
+  //   });
+
+  //   // 3. V3 FIX: Inject the ACTIVE provider's key into window so the
+  //   //    dynamic import in useInterview.js picks it up immediately
+  //   const activeProvider = PROVIDERS.find((p) => p.id === settings.provider);
+  //   if (activeProvider && apiKeys[activeProvider.id]) {
+  //     window[activeProvider.windowKey] = apiKeys[activeProvider.id].trim();
+  //   }
+
+  //   // 4. Apply theme to <html> so CSS variables activate
+  //   document.documentElement.setAttribute("data-theme", settings.theme);
+
+  //   toast.success("Settings saved! New provider active for next interview.");
+  // };
+
+  const handleSave = async () => {
+    // 1. Save to localStorage (existing behaviour)
     saveSettings(settings);
 
-    // 2. Save all API keys to localStorage
+    // 2. Save all API keys to localStorage (existing behaviour)
     PROVIDERS.forEach((p) => {
-      if (apiKeys[p.id]) {
-        localStorage.setItem(p.keyName, apiKeys[p.id].trim());
-      }
+      if (apiKeys[p.id]) localStorage.setItem(p.keyName, apiKeys[p.id].trim());
     });
 
-    // 3. V3 FIX: Inject the ACTIVE provider's key into window so the
-    //    dynamic import in useInterview.js picks it up immediately
+    // 3. Inject active provider's key into window (existing behaviour)
     const activeProvider = PROVIDERS.find((p) => p.id === settings.provider);
     if (activeProvider && apiKeys[activeProvider.id]) {
       window[activeProvider.windowKey] = apiKeys[activeProvider.id].trim();
     }
 
-    // 4. Apply theme to <html> so CSS variables activate
+    // 4. Apply theme (existing behaviour)
     document.documentElement.setAttribute("data-theme", settings.theme);
 
-    toast.success("Settings saved! New provider active for next interview.");
+    // 5. V4 NEW: also save settings to Supabase
+    if (db && userId) {
+      try {
+        await saveSettingsToDB(db, userId, settings);
+        toast.success("Settings saved to cloud!");
+      } catch (e) {
+        // Graceful fallback — local save already happened
+        toast.warn("Saved locally. Cloud sync failed: " + e.message);
+      }
+    } else {
+      toast.success("Settings saved!");
+    }
   };
 
   const handleReset = () => {
