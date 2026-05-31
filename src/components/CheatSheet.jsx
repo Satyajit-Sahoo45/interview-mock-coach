@@ -16,7 +16,7 @@ function getApiModule() {
     case "openai":
       return import("../utils/api-openai.js");
     default:
-      return import("../utils/api-gemini.js");
+      return import("../utils/api-claude.js");
   }
 }
 
