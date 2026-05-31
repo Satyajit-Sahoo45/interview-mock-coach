@@ -22,8 +22,7 @@ export default function useDB() {
     (async () => {
       try {
         // 'supabase' is the name of the JWT template you create in Clerk dashboard
-        const token = await getToken({ template: "supabase" });
-        console.log(token, "token-------------");
+        const token = await getToken({ template: "supabase", skipCache: true });
         if (!cancelled && token) {
           setDb(getSupabaseWithAuth(token));
         }
