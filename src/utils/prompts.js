@@ -36,6 +36,12 @@ export const INTERVIEW_TYPES = [
     desc: "Culture fit, motivations, and career goals",
     icon: "🤝",
   },
+  {
+    id: "mcq",
+    label: "MCQ Quiz",
+    desc: "Multiple choice — test your knowledge fast",
+    icon: "🎯",
+  },
 ];
 
 export const DIFFICULTIES = [
@@ -220,5 +226,63 @@ Respond ONLY with valid JSON — no markdown, no code fences:
     "<bullet 4>"
   ],
   "tip": "<One sentence coaching tip about resume presentation for this role>"
+}
+`;
+
+// ─── MCQ prompt ─────────────────────────────────────────────────────────
+
+export const buildMCQPrompt = (
+  role,
+  difficulty,
+  previousQuestions = [],
+  jobDescription = "",
+) => `
+You are an expert interviewer creating a multiple choice quiz for a ${difficulty}-level ${role} candidate.
+${jobDescription ? `\nJob context:\n"""\n${jobDescription.slice(0, 600)}\n"""` : ""}
+${
+  previousQuestions.length > 0
+    ? `\nAlready asked (DO NOT repeat):\n${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
+    : ""
+}
+ 
+Generate ONE multiple choice question suitable for ${difficulty} level.
+Make all 4 options realistic and plausible — avoid obviously wrong answers.
+Exactly one option must be correct.
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "question":     "<the question text>",
+  "category":     "<e.g. React Hooks | SQL | System Design | Leadership>",
+  "options":      ["<option A>", "<option B>", "<option C>", "<option D>"],
+  "correctIndex": <0-3, index of correct option>,
+  "explanation":  "<2-3 sentences: why correct is right and why others are wrong>"
+}
+`;
+
+// ─── MCQ Summary prompt (NEW) ─────────────────────────────────────────────────
+
+export const buildMCQSummaryPrompt = (results, role, difficulty) => `
+You are an expert career coach reviewing a completed MCQ quiz.
+Role: ${role} | Difficulty: ${difficulty}
+Score: ${results.filter((r) => r.correct).length} / ${results.length} correct
+ 
+Questions:
+${results
+  .map(
+    (r, i) =>
+      `Q${i + 1}: ${r.question}
+  Correct: ${r.options[r.correctIndex]}
+  Candidate chose: ${r.options[r.selectedIndex]} (${r.correct ? "CORRECT" : "WRONG"})`,
+  )
+  .join("\n\n")}
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "percentage":     <score as 0-100 integer>,
+  "rating":         "<Excellent | Good | Average | Needs Work>",
+  "strongAreas":    ["<topic where they did well>"],
+  "weakAreas":      ["<topic to study>"],
+  "studyTopics":    ["<specific thing to read up on 1>", "<specific thing 2>", "<specific thing 3>"],
+  "motivationalNote": "<1-2 sentence personalised message>"
 }
 `;
