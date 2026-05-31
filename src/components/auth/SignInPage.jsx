@@ -1,19 +1,25 @@
-// components/auth/SignInPage.jsx
 // Shown when user is not signed in. Uses Clerk's hosted UI components.
 import { SignIn, SignUp } from "@clerk/clerk-react";
 import { useState } from "react";
 
 export default function SignInPage() {
-  const [mode, setMode] = useState("signin"); // 'signin' | 'signup'
+  const [mode, setMode] = useState("signin");
 
   return (
-    <div className="min-h-screen bg-grid relative overflow-hidden flex flex-col items-center justify-center px-4">
-      {/* Ambient blobs */}
-      <div className="pointer-events-none absolute -top-40 -left-40 w-96 h-96 rounded-full bg-accent/5 blur-[120px]" />
-      <div className="pointer-events-none absolute bottom-0 right-0 w-96 h-96 rounded-full bg-gold/5 blur-[120px]" />
+    <div
+      className="min-h-screen bg-grid relative overflow-hidden
+      flex flex-col items-center justify-center px-4"
+    >
+      <div
+        className="pointer-events-none absolute -top-40 -left-40
+        w-96 h-96 rounded-full bg-accent/5 blur-[120px]"
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 right-0
+        w-96 h-96 rounded-full bg-gold/5 blur-[120px]"
+      />
 
       <div className="relative z-10 w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <div
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
@@ -32,7 +38,6 @@ export default function SignInPage() {
           </p>
         </div>
 
-        {/* Clerk component — handles all auth UI automatically */}
         <div className="flex justify-center">
           {mode === "signin" ? (
             <SignIn
@@ -75,7 +80,6 @@ export default function SignInPage() {
           )}
         </div>
 
-        {/* Toggle between sign in / sign up */}
         <p className="text-center text-muted text-sm mt-4">
           {mode === "signin"
             ? "Don't have an account? "

@@ -4,6 +4,54 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InterviewAI — Practice That Prepares You</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+      default-src 'self';
+ 
+        script-src  'self'
+          https://js.clerk.dev
+          https://*.clerk.accounts.dev
+          https://npm.clerk.dev;
+ 
+        style-src 'self' 'unsafe-inline'
+          https://fonts.googleapis.com;
+ 
+        font-src 'self'
+          https://fonts.gstatic.com;
+ 
+        img-src 'self' data: https: blob:;
+ 
+        connect-src 'self'
+          https://*.supabase.co
+          https://api.clerk.dev
+          https://clerk.dev
+          https://*.clerk.dev
+          https://*.clerk.accounts.dev
+          https://fonts.googleapis.com
+          https://fonts.gstatic.com;
+ 
+        frame-src
+          https://accounts.clerk.dev
+          https://*.clerk.accounts.dev;
+ 
+        worker-src blob:;
+        object-src 'none';
+        base-uri   'self';
+    "
+    />
+
+    <!-- Prevent clickjacking -->
+    <!-- <meta http-equiv="X-Frame-Options" content="DENY" /> -->
+
+    <!-- Prevent MIME sniffing -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+
+    <!-- Referrer policy — don't leak URL to external sites -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -2,70 +2,68 @@ import {
   buildQuestionPrompt,
   buildEvaluationPrompt,
   buildSummaryPrompt,
+  buildFollowUpPrompt,
+  buildCheatSheetPrompt,
+  buildResumeTipsPrompt,
+  buildMCQPrompt,
+  buildMCQSummaryPrompt,
 } from "./prompts";
+import { sanitizeError } from "./sanitize";
 
-const CLAUDE_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
 
-// ─── Core fetch wrapper ───────────────────────────────────────────────────────
-
-async function callClaude(prompt) {
-  const apiKey =
-    window.__CLAUDE_API_KEY__ || localStorage.getItem("claude_api_key") || "";
-  const res = await fetch(CLAUDE_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+async function callProxy(prompt) {
+  let res;
+  try {
+    res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "claude",
+        model: MODEL,
+        payload: {
+          model: MODEL,
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }],
+        },
+      }),
+    });
+  } catch (e) {
+    throw new Error(sanitizeError(e));
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API error ${res.status}`);
+    throw new Error(sanitizeError(err?.error || `Error ${res.status}`));
   }
 
   const data = await res.json();
   const raw = data.content?.find((b) => b.type === "text")?.text || "";
-
-  // Strip markdown fences if model wraps JSON
+  if (!raw) throw new Error("The AI returned an empty response. Try again.");
   const clean = raw
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
     .trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch (_) {
+    throw new Error("The AI returned an unexpected response. Try again.");
+  }
 }
 
-// ─── Public helpers ───────────────────────────────────────────────────────────
-
-export async function fetchQuestion(role, type, difficulty, previousQuestions) {
-  const prompt = buildQuestionPrompt(role, type, difficulty, previousQuestions);
-  return callClaude(prompt);
-  // Returns: { question, category, hints, idealTopics }
-}
-
-export async function evaluateAnswer(question, answer, role, type, difficulty) {
-  const prompt = buildEvaluationPrompt(
-    question,
-    answer,
-    role,
-    type,
-    difficulty,
-  );
-  return callClaude(prompt);
-  // Returns: { score, rating, strengths, gaps, missedPoints, improvedAnswer }
-}
-
-export async function fetchSessionSummary(sessions, role, type, difficulty) {
-  const prompt = buildSummaryPrompt(sessions, role, type, difficulty);
-  return callClaude(prompt);
-  // Returns: { overallScore, overallRating, topStrengths, criticalImprovements,
-  //            studyTopics, motivationalNote }
-}
+export const fetchQuestion = (role, type, diff, prev, jd) =>
+  callProxy(buildQuestionPrompt(role, type, diff, prev, jd));
+export const evaluateAnswer = (q, a, role, type, diff) =>
+  callProxy(buildEvaluationPrompt(q, a, role, type, diff));
+export const fetchFollowUp = (q, a, gaps, role, diff) =>
+  callProxy(buildFollowUpPrompt(q, a, gaps, role, diff));
+export const fetchSessionSummary = (sessions, role, type, diff) =>
+  callProxy(buildSummaryPrompt(sessions, role, type, diff));
+export const fetchCheatSheet = (role, type, diff, jd) =>
+  callProxy(buildCheatSheetPrompt(role, type, diff, jd));
+export const fetchResumeTips = (sessions, role, type) =>
+  callProxy(buildResumeTipsPrompt(sessions, role, type));
+export const fetchMCQQuestion = (role, diff, prev, jd) =>
+  callProxy(buildMCQPrompt(role, diff, prev, jd));
+export const fetchMCQSummary = (results, role, diff) =>
+  callProxy(buildMCQSummaryPrompt(results, role, diff));
