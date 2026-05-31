@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
-import { loadSettings } from "../utils/storage"; // V3: read questionCount + provider
+import { loadSettings } from "../utils/storage"; // read questionCount + provider
+import { sanitizeInput, LIMITS } from "../utils/sanitize.js";
 
-// ── V3: Dynamic API provider switching based on Settings ─────────────────────
+// Dynamic API provider switching based on Settings ─────────────────────
 // Reads the saved provider from localStorage at hook init time.
 // To add a new provider: add its key to storage.js DEFAULT_SETTINGS
 //   and create a matching api-<provider>.js in utils/
@@ -31,21 +32,15 @@ export default function useInterview(config) {
   const [error, setError] = useState(null);
   const [showHint, setShowHint] = useState(false);
   const [showImproved, setShowImproved] = useState(false);
-
-  // V2: follow-up state
   const [followUpQ, setFollowUpQ] = useState(null);
   const [followUpAnswer, setFollowUpAnswer] = useState("");
   const [followUpFeedback, setFollowUpFeedback] = useState(null);
-
-  // V2: retry counter
   const [retryCount, setRetryCount] = useState(0);
 
   const { role, type, difficulty, jobDescription } = config;
-
-  // V3: dynamic question count from Settings (fallback 5)
   const totalQuestions = loadSettings().questionCount || 5;
 
-  // ── Load next question ──────────────────────────────────────────────────────
+  // ── Load question ──────────────────────────────────────────────────────────
   const loadQuestion = useCallback(
     async (sessionsSoFar = []) => {
       setError(null);
@@ -79,7 +74,6 @@ export default function useInterview(config) {
     [role, type, difficulty, jobDescription],
   );
 
-  // ── Start interview ─────────────────────────────────────────────────────────
   const startInterview = useCallback(() => {
     setQIndex(0);
     setSessions([]);
@@ -87,16 +81,18 @@ export default function useInterview(config) {
     loadQuestion([]);
   }, [loadQuestion]);
 
-  // ── Submit main answer ──────────────────────────────────────────────────────
+  // ── Submit answer — SANITIZE before sending ────────────────────────────────
   const submitAnswer = useCallback(async () => {
     if (!answer.trim() || !currentQ) return;
     setError(null);
     setState("evaluating");
     try {
       const { evaluateAnswer } = await getApiModule();
+      // Sanitize the answer before it goes into the AI prompt
+      const safeAnswer = sanitizeInput(answer, LIMITS.ANSWER);
       const fb = await evaluateAnswer(
         currentQ.question,
-        answer,
+        safeAnswer,
         role,
         type,
         difficulty,
@@ -109,7 +105,7 @@ export default function useInterview(config) {
     }
   }, [answer, currentQ, role, type, difficulty]);
 
-  // ── V2: Retry same question ─────────────────────────────────────────────────
+  // ── Retry ──────────────────────────────────────────────────────────────────
   const retryQuestion = useCallback(() => {
     setAnswer("");
     setFeedback(null);
@@ -122,16 +118,18 @@ export default function useInterview(config) {
     setState("answering");
   }, []);
 
-  // ── V2: Load follow-up question ─────────────────────────────────────────────
+  // ── Load follow-up ─────────────────────────────────────────────────────────
   const loadFollowUp = useCallback(async () => {
     if (!feedback?.gaps?.length) return;
     setError(null);
     setState("followup-loading");
     try {
       const { fetchFollowUp } = await getApiModule();
+      // Sanitize answer before sending as context
+      const safeAnswer = sanitizeInput(answer, LIMITS.ANSWER);
       const result = await fetchFollowUp(
         currentQ.question,
-        answer,
+        safeAnswer,
         feedback.gaps,
         role,
         difficulty,
@@ -144,16 +142,18 @@ export default function useInterview(config) {
     }
   }, [feedback, currentQ, answer, role, difficulty]);
 
-  // ── V2: Submit follow-up answer ─────────────────────────────────────────────
+  // ── Submit follow-up — SANITIZE before sending ────────────────────────────
   const submitFollowUp = useCallback(async () => {
     if (!followUpAnswer.trim() || !followUpQ) return;
     setError(null);
     setState("followup-evaluating");
     try {
       const { evaluateAnswer } = await getApiModule();
+      // Sanitize the follow-up answer before sending
+      const safeFollowUp = sanitizeInput(followUpAnswer, LIMITS.ANSWER);
       const fb = await evaluateAnswer(
         followUpQ.followUp,
-        followUpAnswer,
+        safeFollowUp,
         role,
         type,
         difficulty,
@@ -166,23 +166,24 @@ export default function useInterview(config) {
     }
   }, [followUpAnswer, followUpQ, role, type, difficulty]);
 
-  // ── Next question or finish ─────────────────────────────────────────────────
+  // ── Next question or finish ────────────────────────────────────────────────
   const nextQuestion = useCallback(async () => {
     const newSession = {
       question: currentQ.question,
       category: currentQ.category,
-      answer,
+      answer: sanitizeInput(answer, LIMITS.ANSWER), // ← sanitize before storing
       feedback,
       retryCount,
       followUpQ: followUpQ?.followUp || null,
-      followUpAnswer: followUpAnswer || null,
+      followUpAnswer: followUpAnswer
+        ? sanitizeInput(followUpAnswer, LIMITS.ANSWER)
+        : null,
       followUpFeedback,
     };
     const updatedSessions = [...sessions, newSession];
     setSessions(updatedSessions);
 
     if (updatedSessions.length >= totalQuestions) {
-      // V3: was TOTAL_QUESTIONS
       setState("loading-question");
       try {
         const { fetchSessionSummary } = await getApiModule();
@@ -195,7 +196,6 @@ export default function useInterview(config) {
         setSummary(s);
         setState("done");
       } catch (e) {
-        // V3: navigate forward even if summary generation fails
         setError(e.message || "Failed to generate summary.");
         setSummary(null);
         setState("done");
@@ -254,6 +254,6 @@ export default function useInterview(config) {
     loadFollowUp,
     submitFollowUp,
     nextQuestion,
-    totalQuestions, // V3: dynamic from settings
+    totalQuestions,
   };
 }
