@@ -123,6 +123,118 @@ export async function saveSettingsToDB(db, userId, settings) {
   if (error) throw new Error(error.message);
 }
 
+// ---------- MCQ Sessions -----------------
+
+/**
+ * Save a completed MCQ quiz + all question rows.
+ * results = array of { question, category, options, correctIndex,
+ *                      selectedIndex, correct, timedOut, explanation }
+ * summary = AI summary object { percentage, rating, strongAreas, ... }
+ */
+export async function saveMCQSessionToDB(
+  db,
+  { userId, config, results, summary },
+) {
+  const correct = results.filter((r) => r.correct).length;
+  const wrong = results.filter((r) => !r.correct && !r.timedOut).length;
+  const timedOut = results.filter((r) => r.timedOut).length;
+  const pct =
+    summary?.percentage ?? Math.round((correct / results.length) * 100);
+
+  // 1. Insert parent mcq_session row
+  const { data: sessionRow, error: sessionErr } = await db
+    .from("mcq_sessions")
+    .insert({
+      user_id: userId,
+      role: config.role,
+      difficulty: config.difficulty,
+      total_questions: results.length,
+      correct_count: correct,
+      wrong_count: wrong,
+      timed_out_count: timedOut,
+      percentage: pct,
+      rating: summary?.rating || null,
+      summary: summary || null,
+      config: config,
+    })
+    .select()
+    .single();
+
+  if (sessionErr) throw new Error(sessionErr.message);
+
+  // 2. Insert each question as a child row
+  if (results.length) {
+    const questionRows = results.map((r, i) => ({
+      session_id: sessionRow.id,
+      user_id: userId,
+      question_index: i,
+      question: r.question,
+      category: r.category || null,
+      options: r.options, // stored as JSON array
+      correct_index: r.correctIndex,
+      selected_index: r.timedOut ? null : r.selectedIndex,
+      is_correct: r.correct,
+      is_timed_out: r.timedOut || false,
+      explanation: r.explanation || null,
+    }));
+
+    const { error: qErr } = await db.from("mcq_questions").insert(questionRows);
+    if (qErr) throw new Error(qErr.message);
+  }
+
+  return sessionRow;
+}
+
+/**
+ * Load all MCQ sessions for a user, newest first.
+ * Each session includes its child mcq_questions array.
+ */
+export async function loadMCQSessionsFromDB(db, userId) {
+  const { data, error } = await db
+    .from("mcq_sessions")
+    .select(`*, mcq_questions (*)`)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw new Error(error.message);
+
+  return (data || []).map((row) => ({
+    id: row.id,
+    savedAt: row.created_at,
+    config: row.config,
+    summary: row.summary,
+    totalQuestions: row.total_questions,
+    correctCount: row.correct_count,
+    wrongCount: row.wrong_count,
+    timedOutCount: row.timed_out_count,
+    percentage: row.percentage,
+    rating: row.rating,
+    results: (row.mcq_questions || [])
+      .sort((a, b) => a.question_index - b.question_index)
+      .map((q) => ({
+        question: q.question,
+        category: q.category,
+        options: q.options,
+        correctIndex: q.correct_index,
+        selectedIndex: q.selected_index,
+        correct: q.is_correct,
+        timedOut: q.is_timed_out,
+        explanation: q.explanation,
+      })),
+  }));
+}
+
+/**
+ * Delete a single MCQ session (cascades to mcq_questions via FK).
+ */
+export async function deleteMCQSessionFromDB(db, sessionId) {
+  const { error } = await db.from("mcq_sessions").delete().eq("id", sessionId);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Compute Stats -----------
+
 export function computeStatsFromRows(rows) {
   if (!rows?.length) return null;
   const scores = rows
@@ -140,4 +252,21 @@ export function computeStatsFromRows(rows) {
   });
   const topRole = Object.entries(rc).sort((a, b) => b[1] - a[1])[0]?.[0];
   return { total: rows.length, avgScore: avg, best, trend, topRole };
+}
+
+export function computeMCQStatsFromRows(rows) {
+  if (!rows?.length) return null;
+  const percentages = rows.map((r) => r.percentage || 0);
+  const avg = Math.round(
+    percentages.reduce((a, b) => a + b, 0) / percentages.length,
+  );
+  const best = Math.max(...percentages);
+  const trend = percentages.slice(0, 5).reverse();
+  const rc = {};
+  rows.forEach((r) => {
+    const role = r.config?.role || "unknown";
+    rc[role] = (rc[role] || 0) + 1;
+  });
+  const topRole = Object.entries(rc).sort((a, b) => b[1] - a[1])[0]?.[0];
+  return { total: rows.length, avgPercent: avg, best, trend, topRole };
 }
