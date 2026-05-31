@@ -11,6 +11,7 @@ import { saveSessionToDB, loadSettingsFromDB } from "./utils/db";
 import useDB from "./hooks/useDB";
 import { useAuth } from "@clerk/clerk-react";
 import SignInPage from "./components/auth/SignInPage";
+import MCQRoom from "./components/MCQRoom";
 
 export default function App() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -46,7 +47,7 @@ export default function App() {
             cloudSettings.theme || "dark",
           );
         } else {
-          // First sign-in: no cloud settings yet — they'll be saved when user opens Settings
+          console.warn("Could not load settings from DB:", e.message);
         }
       } catch (e) {
         console.warn("Could not load settings from DB:", e.message);
@@ -82,7 +83,12 @@ export default function App() {
     setConfig(cfg);
     setSessions([]);
     setSummary(null);
-    setScreen("cheatsheet");
+    // route MCQ type directly to quiz, skip cheat sheet
+    if (cfg.type === "mcq") {
+      setScreen("mcq");
+    } else {
+      setScreen("cheatsheet");
+    }
   };
 
   const handleStartInterview = () => setScreen("interview");
@@ -109,6 +115,11 @@ export default function App() {
     setScreen("report");
   };
 
+  //MCQ quiz finishes — go back home
+  const handleMCQComplete = () => {
+    setScreen("home");
+  };
+
   const handleRestart = () => {
     setScreen("home");
     setConfig(null);
@@ -131,6 +142,15 @@ export default function App() {
             config={config}
             onBack={() => setScreen("home")}
             onStartInterview={handleStartInterview}
+          />
+        )}
+        {screen === "mcq" && config && (
+          <MCQRoom
+            config={config}
+            onComplete={handleMCQComplete}
+            onExit={handleRestart}
+            db={db}
+            userId={userId}
           />
         )}
         {screen === "interview" && config && (
