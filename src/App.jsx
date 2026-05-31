@@ -3,7 +3,7 @@ import Home from "./components/Home";
 import InterviewRoom from "./components/InterviewRoom";
 import SessionReport from "./components/SessionReport";
 import History from "./components/History";
-import { loadSettings, saveSession } from "./utils/storage";
+import { loadSettings, saveSession, saveSettings } from "./utils/storage";
 import Settings from "./components/Settings";
 import { ToastProvider } from "./components/ui/Toast";
 import CheatSheet from "./components/CheatSheet";
