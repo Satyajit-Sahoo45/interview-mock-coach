@@ -4,6 +4,8 @@ import {
   buildSummaryPrompt,
   buildFollowUpPrompt,
   buildCheatSheetPrompt,
+  buildMCQPrompt,
+  buildMCQSummaryPrompt,
 } from "./prompts";
 
 const MODEL = "gemini-3.1-flash-lite"; // swap to 'gemini-1.5-pro' for higher quality
@@ -120,3 +122,9 @@ export async function fetchSessionSummary(sessions, role, type, difficulty) {
 
 export const fetchCheatSheet = (role, type, diff, jd) =>
   callGemini(buildCheatSheetPrompt(role, type, diff, jd));
+
+// MCQ exports
+export const fetchMCQQuestion = (role, diff, prev, jd) =>
+  callGemini(buildMCQPrompt(role, diff, prev, jd));
+export const fetchMCQSummary = (results, role, diff) =>
+  callGemini(buildMCQSummaryPrompt(results, role, diff));
