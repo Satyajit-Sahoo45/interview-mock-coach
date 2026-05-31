@@ -1,8 +1,24 @@
-// components/auth/UserMenu.jsx
 // Shown in the top bar on Home, History, and Settings screens.
 // Displays the user's avatar and a dropdown with sign-out.
 import { useState, useRef, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/clerk-react";
+
+// Keys to wipe on sign-out — prevents data leakage on shared devices
+const SENSITIVE_KEYS = [
+  "gemini_api_key",
+  "openai_api_key",
+  "claude_api_key",
+  "interviewai_sessions",
+  "interviewai_settings",
+];
+
+function clearSensitiveStorage() {
+  SENSITIVE_KEYS.forEach((k) => localStorage.removeItem(k));
+  // Clear window globals too
+  delete window.__GEMINI_API_KEY__;
+  delete window.__CLAUDE_API_KEY__;
+  delete window.__OPENAI_API_KEY__;
+}
 
 export default function UserMenu() {
   const { user } = useUser();
@@ -10,7 +26,6 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
@@ -26,14 +41,19 @@ export default function UserMenu() {
     user.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ||
     "?";
 
+  const handleSignOut = async () => {
+    // Clear sensitive data BEFORE signing out
+    clearSensitiveStorage();
+    await signOut();
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-xl border border-border bg-card
-          px-2 py-1.5 transition-all hover:border-border-light cursor-pointer"
+        className="flex items-center gap-2 rounded-xl border border-border
+          bg-card px-2 py-1.5 transition-all hover:border-border-light cursor-pointer"
       >
-        {/* Avatar */}
         {user.imageUrl ? (
           <img
             src={user.imageUrl}
@@ -56,13 +76,11 @@ export default function UserMenu() {
         <span className="text-muted text-xs">{open ? "▲" : "▼"}</span>
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div
-          className="absolute right-0 top-10 w-56 glass-card rounded-xl shadow-2xl
-          border border-border z-50 overflow-hidden animate-fade-in"
+          className="absolute right-0 top-10 w-56 glass-card rounded-xl
+          shadow-2xl border border-border z-50 overflow-hidden animate-fade-in"
         >
-          {/* User info */}
           <div className="px-4 py-3 border-b border-border">
             <div className="text-sm font-display font-semibold text-text truncate">
               {user.fullName || "User"}
@@ -71,8 +89,6 @@ export default function UserMenu() {
               {user.emailAddresses?.[0]?.emailAddress}
             </div>
           </div>
-
-          {/* Actions */}
           <div className="p-1">
             <button
               onClick={() => {
@@ -85,7 +101,7 @@ export default function UserMenu() {
               👤 Manage account
             </button>
             <button
-              onClick={() => signOut()}
+              onClick={handleSignOut}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm
                 text-danger hover:bg-danger/5 transition-all text-left"
             >

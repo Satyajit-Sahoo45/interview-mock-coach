@@ -3,9 +3,22 @@ import Card from "./ui/Card";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
 import DotLoader from "./ui/DotLoader";
-import { fetchCheatSheet } from "../utils/api";
 import { ROLES, INTERVIEW_TYPES } from "../utils/prompts";
 import { useToast } from "./ui/Toast";
+import { loadSettings } from "../utils/storage";
+import { sanitizeError } from "../utils/sanitize";
+
+function getApiModule() {
+  const provider = loadSettings().provider || "gemini";
+  switch (provider) {
+    case "claude":
+      return import("../utils/api.js");
+    case "openai":
+      return import("../utils/api-openai.js");
+    default:
+      return import("../utils/api-gemini.js");
+  }
+}
 
 export default function CheatSheet({ config, onBack, onStartInterview }) {
   const [data, setData] = useState(null);
@@ -24,24 +37,27 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
     let mounted = true;
     setLoading(true);
     setError(null);
-    fetchCheatSheet(
-      roleLabel,
-      config.type,
-      config.difficulty,
-      config.jobDescription || "",
-    )
-      .then((d) => {
+    (async () => {
+      try {
+        const { fetchCheatSheet } = await getApiModule();
+        const d = await fetchCheatSheet(
+          roleLabel,
+          config.type,
+          config.difficulty,
+          config.jobDescription || "",
+        );
         if (mounted) {
           setData(d);
           setLoading(false);
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         if (mounted) {
-          setError(e.message);
+          setError(sanitizeError(e));
           setLoading(false);
         }
-      });
+      }
+    })();
+
     return () => {
       mounted = false;
     };
@@ -53,32 +69,35 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
       `📋 Pre-Interview Cheat Sheet`,
       `Role: ${roleLabel} | Type: ${typeLabel} | Level: ${config.difficulty}`,
       "",
-      "🎯 Key Topics to Cover:",
-      ...data.keyTopics.map((t) => `  • ${t}`),
+      "🎯 Key Topics:",
+      ...(data.keyTopics || []).map((t) => `  • ${t}`),
       "",
-      "⚡ Power Phrases:",
-      ...data.powerPhrases.map((p) => `  • ${p}`),
+      "💬 Power Phrases:",
+      ...(data.powerPhrases || []).map((p) => `  • "${p}"`),
       "",
-      "🚫 Common Mistakes to Avoid:",
-      ...data.commonMistakes.map((m) => `  • ${m}`),
+      "🚫 Avoid:",
+      ...(data.commonMistakes || []).map((m) => `  • ${m}`),
       "",
-      "❓ Questions to Ask the Interviewer:",
-      ...data.questionsToAsk.map((q) => `  • ${q}`),
+      "❓ Ask the Interviewer:",
+      ...(data.questionsToAsk || []).map((q) => `  • ${q}`),
     ].join("\n");
     navigator.clipboard.writeText(text);
-    toast.success("Cheat sheet copied to clipboard!");
+    toast.success("Cheat sheet copied!");
   };
 
   return (
     <div className="min-h-screen bg-grid relative overflow-hidden">
-      <div className="pointer-events-none absolute top-0 right-0 w-96 h-96 rounded-full bg-gold/5 blur-[120px]" />
+      <div
+        className="pointer-events-none absolute top-0 right-0
+        w-96 h-96 rounded-full bg-gold/5 blur-[120px]"
+      />
 
       <div className="relative z-10 max-w-2xl mx-auto px-4 py-12">
-        {/* ── Header ── */}
         <div className="animate-fade-in mb-8">
           <button
             onClick={onBack}
-            className="text-muted hover:text-text text-sm font-mono mb-4 flex items-center gap-1 transition-colors"
+            className="text-muted hover:text-text text-sm font-mono mb-4
+              flex items-center gap-1 transition-colors"
           >
             ← Back
           </button>
@@ -113,14 +132,12 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
           </p>
         </div>
 
-        {/* ── Loading ── */}
         {loading && (
           <Card className="p-16 flex items-center justify-center">
             <DotLoader label="Generating your cheat sheet..." />
           </Card>
         )}
 
-        {/* ── Error ── */}
         {error && !loading && (
           <Card className="p-6 border-danger/30 bg-danger/5">
             <p className="text-danger text-sm font-mono mb-4">⚠️ {error}</p>
@@ -134,10 +151,8 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
           </Card>
         )}
 
-        {/* ── Cheat Sheet Content ── */}
         {data && !loading && (
           <div className="space-y-5 animate-slide-up">
-            {/* Key Topics */}
             <Card className="p-5">
               <SectionHead
                 icon="🎯"
@@ -153,7 +168,6 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
               </div>
             </Card>
 
-            {/* STAR Example */}
             {data.starExamples?.length > 0 && (
               <Card className="p-5">
                 <SectionHead
@@ -178,7 +192,6 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
               </Card>
             )}
 
-            {/* Power Phrases */}
             <Card className="p-5">
               <SectionHead
                 icon="💬"
@@ -189,8 +202,8 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
                 {data.powerPhrases?.map((p, i) => (
                   <li
                     key={i}
-                    className="flex items-start gap-2 text-sm text-text/80 px-3 py-2
-                      rounded-lg bg-success/5 border border-success/10"
+                    className="flex items-start gap-2 text-sm text-text/80
+                    px-3 py-2 rounded-lg bg-success/5 border border-success/10"
                   >
                     <span className="text-success shrink-0 mt-0.5">»</span>
                     <span className="italic">"{p}"</span>
@@ -199,7 +212,6 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
               </ul>
             </Card>
 
-            {/* Common Mistakes */}
             <Card className="p-5">
               <SectionHead
                 icon="🚫"
@@ -219,7 +231,6 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
               </ul>
             </Card>
 
-            {/* Questions to ask */}
             <Card className="p-5">
               <SectionHead
                 icon="❓"
@@ -241,7 +252,6 @@ export default function CheatSheet({ config, onBack, onStartInterview }) {
               </ul>
             </Card>
 
-            {/* CTA */}
             <Button onClick={onStartInterview} className="w-full" size="lg">
               I'm Ready — Start Interview →
             </Button>
