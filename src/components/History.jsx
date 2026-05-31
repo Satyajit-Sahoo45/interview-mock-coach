@@ -1,6 +1,3 @@
-// components/History.jsx — FULL UPDATED FILE
-// Shows both interview sessions AND MCQ quiz sessions in one unified list
-// REPLACE your existing History.jsx with this
 import { useState, useEffect, useMemo } from "react";
 import {
   loadSessionsFromDB,
