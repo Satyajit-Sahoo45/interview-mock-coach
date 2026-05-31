@@ -5,7 +5,7 @@ import Card from "./ui/Card";
 import ScoreRing from "./ui/ScoreRing";
 import { ROLES, INTERVIEW_TYPES } from "../utils/prompts";
 import { useToast } from "./ui/Toast";
-import ProgressBar from "./ui/ProgressBar";
+import ProgressBar from "./ui/Progressbar";
 import Confetti from "./ui/Confetti";
 
 export default function SessionReport({

@@ -13,7 +13,7 @@ import Card from "./ui/Card";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import ScoreRing from "./ui/ScoreRing";
-import ProgressBar from "./ui/ProgressBar";
+import ProgressBar from "./ui/Progressbar";
 import DotLoader from "./ui/DotLoader";
 import Tabs from "./ui/Tabs";
 import MCQOption from "./ui/MCQOption";
