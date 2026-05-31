@@ -1,87 +1,78 @@
+// utils/api-openai.js — SECURE VERSION (OpenAI via proxy)
 import {
   buildQuestionPrompt,
   buildEvaluationPrompt,
   buildSummaryPrompt,
+  buildFollowUpPrompt,
+  buildCheatSheetPrompt,
+  buildResumeTipsPrompt,
+  buildMCQPrompt,
+  buildMCQSummaryPrompt,
 } from "./prompts";
+import { sanitizeError } from "./sanitize";
 
-const OPENAI_API = "https://api.openai.com/v1/chat/completions";
-const MODEL = "gpt-4o"; // swap to 'gpt-3.5-turbo' to reduce cost
+const MODEL = "gpt-4o";
 
-// ─── Core fetch wrapper ───────────────────────────────────────────────────────
-
-async function callGPT(prompt) {
-  const apiKey =
-    window.__OPENAI_API_KEY__ || localStorage.getItem("openai_api_key") || "";
-
-  const res = await fetch(OPENAI_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1000,
-      temperature: 0.7,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert interviewer and career coach. Always respond with valid JSON only — no markdown, no explanation, no code fences.",
+async function callProxy(prompt) {
+  let res;
+  try {
+    res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "openai",
+        model: MODEL,
+        payload: {
+          model: MODEL,
+          max_tokens: 1500,
+          temperature: 0.7,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert interviewer and career coach. Always respond with valid JSON only — no markdown, no code fences.",
+            },
+            { role: "user", content: prompt },
+          ],
         },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    }),
-  });
+      }),
+    });
+  } catch (e) {
+    throw new Error(sanitizeError(e));
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const msg = err?.error?.message || `OpenAI API error ${res.status}`;
-    throw new Error(msg);
+    throw new Error(sanitizeError(err?.error || `Error ${res.status}`));
   }
 
   const data = await res.json();
   const raw = data.choices?.[0]?.message?.content || "";
-
-  // Strip markdown fences just in case model wraps response
+  if (!raw) throw new Error("The AI returned an empty response. Try again.");
   const clean = raw
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
     .trim();
-
   try {
     return JSON.parse(clean);
   } catch (_) {
-    throw new Error("GPT returned invalid JSON. Try again.");
+    throw new Error("The AI returned an unexpected response. Try again.");
   }
 }
 
-// ─── Public helpers ───────────────────────────────────────────────────────────
-
-export async function fetchQuestion(role, type, difficulty, previousQuestions) {
-  const prompt = buildQuestionPrompt(role, type, difficulty, previousQuestions);
-  return callGPT(prompt);
-  // Returns: { question, category, hints, idealTopics }
-}
-
-export async function evaluateAnswer(question, answer, role, type, difficulty) {
-  const prompt = buildEvaluationPrompt(
-    question,
-    answer,
-    role,
-    type,
-    difficulty,
-  );
-  return callGPT(prompt);
-  // Returns: { score, rating, strengths, gaps, missedPoints, improvedAnswer }
-}
-
-export async function fetchSessionSummary(sessions, role, type, difficulty) {
-  const prompt = buildSummaryPrompt(sessions, role, type, difficulty);
-  return callGPT(prompt);
-  // Returns: { overallScore, overallRating, topStrengths, criticalImprovements,
-  //            studyTopics, motivationalNote }
-}
+export const fetchQuestion = (role, type, diff, prev, jd) =>
+  callProxy(buildQuestionPrompt(role, type, diff, prev, jd));
+export const evaluateAnswer = (q, a, role, type, diff) =>
+  callProxy(buildEvaluationPrompt(q, a, role, type, diff));
+export const fetchFollowUp = (q, a, gaps, role, diff) =>
+  callProxy(buildFollowUpPrompt(q, a, gaps, role, diff));
+export const fetchSessionSummary = (sessions, role, type, diff) =>
+  callProxy(buildSummaryPrompt(sessions, role, type, diff));
+export const fetchCheatSheet = (role, type, diff, jd) =>
+  callProxy(buildCheatSheetPrompt(role, type, diff, jd));
+export const fetchResumeTips = (sessions, role, type) =>
+  callProxy(buildResumeTipsPrompt(sessions, role, type));
+export const fetchMCQQuestion = (role, diff, prev, jd) =>
+  callProxy(buildMCQPrompt(role, diff, prev, jd));
+export const fetchMCQSummary = (results, role, diff) =>
+  callProxy(buildMCQSummaryPrompt(results, role, diff));
