@@ -41,7 +41,7 @@
   ],
   "functions": {
     "api/chat.js": {
-      "runtime": "edge"
+      "runtime": "nodejs20.x"
     }
   }
 }
