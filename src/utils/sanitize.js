@@ -72,9 +72,11 @@ export function sanitizeConfig(config) {
     "mobile",
     "ml",
     "qa",
+    "mt",
+    "at",
   ];
   const ALLOWED_TYPES = ["behavioral", "technical", "hr", "mcq"];
-  const ALLOWED_DIFFS = ["junior", "mid", "senior"];
+  const ALLOWED_DIFFS = ["fresher", "junior", "mid", "senior"];
 
   return {
     role: ALLOWED_ROLES.includes(config.role) ? config.role : "frontend",
