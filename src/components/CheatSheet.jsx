@@ -11,7 +11,7 @@ import { sanitizeError } from "../utils/sanitize";
 function getApiModule() {
   const provider = loadSettings().provider || "gemini";
   switch (provider) {
-    case "claude":
+    case "gemini":
       return import("../utils/api.js");
     case "openai":
       return import("../utils/api-openai.js");
