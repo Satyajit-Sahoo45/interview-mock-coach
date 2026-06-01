@@ -93,7 +93,7 @@ export default function Home({ onStart, onHistory, onSettings }) {
             <span className="text-gradient-accent">Real.</span>
           </h1>
           <p className="text-muted text-lg max-w-xl mx-auto">
-            Cheat sheets · Voice input · Follow-ups · Resume tips · MCQ quizzes
+            Cheat sheets · Voice input · Follow-ups · MCQ quizzes
           </p>
         </div>
 
@@ -225,7 +225,6 @@ export default function Home({ onStart, onHistory, onSettings }) {
             "💬 Follow-ups",
             "🔄 Retry",
             "📋 Cheat Sheet",
-            "📄 Resume Tips",
             "🎯 MCQ Quiz",
             "📊 History",
             "⚙️ Settings",

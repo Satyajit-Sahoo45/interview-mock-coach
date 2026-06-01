@@ -23,7 +23,7 @@ function getApiModule() {
   }
 }
 
-const TOTAL_QUESTIONS = 2;
+const TOTAL_QUESTIONS = 10;
 
 export default function MCQRoom({ config, onComplete, onExit, db, userId }) {
   const toast = useToast();
