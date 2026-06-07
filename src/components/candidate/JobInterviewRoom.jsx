@@ -6,7 +6,7 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import DotLoader from "../ui/DotLoader.jsx";
 import ScoreRing from "../ui/ScoreRing.jsx";
-import ProgressBar from "../ui/ProgressBar.jsx";
+import ProgressBar from "../ui/Progressbar.jsx";
 import VoiceRecorder from "../ui/VoiceRecorder.jsx";
 import Confetti from "../ui/Confetti.jsx";
 import { useToast } from "../ui/Toast.jsx";

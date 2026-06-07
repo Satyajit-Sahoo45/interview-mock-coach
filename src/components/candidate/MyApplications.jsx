@@ -5,7 +5,7 @@ import Card from "../ui/Card";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import DotLoader from "../ui/DotLoader";
-import ProgressBar from "../ui/ProgressBar";
+import ProgressBar from "../ui/Progressbar";
 import ScoreRing from "../ui/ScoreRing";
 import { useToast } from "../ui/Toast";
 import { getMyApplications } from "../../utils/db-recruiter";

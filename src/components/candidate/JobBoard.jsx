@@ -4,7 +4,7 @@ import Card from "../ui/Card";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import DotLoader from "../ui/DotLoader";
-import ProgressBar from "../ui/ProgressBar";
+import ProgressBar from "../ui/Progressbar";
 import { useToast } from "../ui/Toast";
 import { getActiveJobs } from "../../utils/db-recruiter";
 import { ROLES, DIFFICULTIES } from "../../utils/prompts";
