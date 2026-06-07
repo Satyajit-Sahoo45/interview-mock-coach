@@ -9,6 +9,9 @@ import {
   buildResumeTipsPrompt,
   buildMCQPrompt,
   buildMCQSummaryPrompt,
+  buildAutoQuestionsPrompt,
+  buildJobSummaryPrompt,
+  buildJobEvaluationPrompt,
 } from "./prompts";
 import { sanitizeError } from "./sanitize";
 
@@ -82,3 +85,9 @@ export const fetchMCQQuestion = (role, diff, prev, jd) =>
   callProxy(buildMCQPrompt(role, diff, prev, jd));
 export const fetchMCQSummary = (results, role, diff) =>
   callProxy(buildMCQSummaryPrompt(results, role, diff));
+export const fetchJobEvaluation = (q, ideal, answer, role, diff) =>
+  callProxy(buildJobEvaluationPrompt(q, ideal, answer, role, diff));
+export const fetchJobSummary = (answers, role, title, thresh) =>
+  callProxy(buildJobSummaryPrompt(answers, role, title, thresh));
+export const fetchAutoQuestions = (title, role, diff, jd, count) =>
+  callProxy(buildAutoQuestionsPrompt(title, role, diff, jd, count));

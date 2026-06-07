@@ -1,47 +1,68 @@
-// utils/db.js — All Supabase DB operations
-// Every fn receives `db` — authenticated Supabase client from getSupabaseWithAuth(token)
+// Retries a DB operation up to `maxAttempts` times with exponential backoff.
+// Handles transient network errors and token-refresh races.
+async function saveWithRetry(operation, maxAttempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts) {
+        // Wait 500ms, 1000ms, 2000ms before retrying
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
+    }
+  }
+  throw lastError;
+}
 
 export async function saveSessionToDB(
   db,
   { userId, config, sessions, summary },
 ) {
-  const { data: sessionRow, error: sessionErr } = await db
-    .from("interview_sessions")
-    .insert({
-      user_id: userId,
-      role: config.role,
-      type: config.type,
-      difficulty: config.difficulty,
-      overall_score: summary?.overallScore || null,
-      overall_rating: summary?.overallRating || null,
-      summary: summary || null,
-      config: config,
-    })
-    .select()
-    .single();
+  return saveWithRetry(async () => {
+    const { data: sessionRow, error: sessionErr } = await db
+      .from("interview_sessions")
+      .insert({
+        user_id: userId,
+        role: config.role,
+        type: config.type,
+        difficulty: config.difficulty,
+        overall_score: summary?.overallScore || null,
+        overall_rating: summary?.overallRating || null,
+        summary: summary || null,
+        config: config,
+      })
+      .select()
+      .single();
 
-  if (sessionErr) throw new Error(sessionErr.message);
+    if (sessionErr) throw new Error(sessionErr.message);
 
-  if (sessions?.length) {
-    const questionRows = sessions.map((s) => ({
-      session_id: sessionRow.id,
-      user_id: userId,
-      question: s.question,
-      category: s.category || null,
-      answer: s.answer || null,
-      feedback: s.feedback || null,
-      retry_count: s.retryCount || 0,
-      follow_up_q: s.followUpQ || null,
-      follow_up_answer: s.followUpAnswer || null,
-      follow_up_feedback: s.followUpFeedback || null,
-    }));
-    const { error: qErr } = await db
-      .from("question_sessions")
-      .insert(questionRows);
-    if (qErr) throw new Error(qErr.message);
-  }
+    if (sessions?.length) {
+      const questionRows = sessions.map((s) => ({
+        session_id: sessionRow.id,
+        user_id: userId,
+        question: s.question,
+        category: s.category || null,
+        answer: s.answer || null,
+        feedback: s.feedback || null,
+        retry_count: s.retryCount || 0,
+        follow_up_q: s.followUpQ || null,
+        follow_up_answer: s.followUpAnswer || null,
+        follow_up_feedback: s.followUpFeedback || null,
+      }));
+      const { error: qErr } = await db
+        .from("question_sessions")
+        .insert(questionRows);
+      if (qErr) {
+        // Rollback: delete the parent row so we don't have orphaned session
+        await db.from("interview_sessions").delete().eq("id", sessionRow.id);
+        throw new Error(`Questions insert failed: ${qErr.message}`);
+      }
+    }
 
-  return sessionRow;
+    return sessionRow;
+  });
 }
 
 export async function loadSessionsFromDB(db, userId) {
@@ -135,54 +156,62 @@ export async function saveMCQSessionToDB(
   db,
   { userId, config, results, summary },
 ) {
-  const correct = results.filter((r) => r.correct).length;
-  const wrong = results.filter((r) => !r.correct && !r.timedOut).length;
-  const timedOut = results.filter((r) => r.timedOut).length;
-  const pct =
-    summary?.percentage ?? Math.round((correct / results.length) * 100);
+  return saveWithRetry(async () => {
+    const correct = results.filter((r) => r.correct).length;
+    const wrong = results.filter((r) => !r.correct && !r.timedOut).length;
+    const timedOut = results.filter((r) => r.timedOut).length;
+    const pct =
+      summary?.percentage ?? Math.round((correct / results.length) * 100);
 
-  // 1. Insert parent mcq_session row
-  const { data: sessionRow, error: sessionErr } = await db
-    .from("mcq_sessions")
-    .insert({
-      user_id: userId,
-      role: config.role,
-      difficulty: config.difficulty,
-      total_questions: results.length,
-      correct_count: correct,
-      wrong_count: wrong,
-      timed_out_count: timedOut,
-      percentage: pct,
-      rating: summary?.rating || null,
-      summary: summary || null,
-      config: config,
-    })
-    .select()
-    .single();
+    // 1. Insert parent mcq_session row
+    const { data: sessionRow, error: sessionErr } = await db
+      .from("mcq_sessions")
+      .insert({
+        user_id: userId,
+        role: config.role,
+        difficulty: config.difficulty,
+        total_questions: results.length,
+        correct_count: correct,
+        wrong_count: wrong,
+        timed_out_count: timedOut,
+        percentage: pct,
+        rating: summary?.rating || null,
+        summary: summary || null,
+        config: config,
+      })
+      .select()
+      .single();
 
-  if (sessionErr) throw new Error(sessionErr.message);
+    if (sessionErr) throw new Error(sessionErr.message);
 
-  // 2. Insert each question as a child row
-  if (results.length) {
-    const questionRows = results.map((r, i) => ({
-      session_id: sessionRow.id,
-      user_id: userId,
-      question_index: i,
-      question: r.question,
-      category: r.category || null,
-      options: r.options, // stored as JSON array
-      correct_index: r.correctIndex,
-      selected_index: r.timedOut ? null : r.selectedIndex,
-      is_correct: r.correct,
-      is_timed_out: r.timedOut || false,
-      explanation: r.explanation || null,
-    }));
+    // 2. Insert each question as a child row
+    if (results.length) {
+      const questionRows = results.map((r, i) => ({
+        session_id: sessionRow.id,
+        user_id: userId,
+        question_index: i,
+        question: r.question,
+        category: r.category || null,
+        options: r.options, // stored as JSON array
+        correct_index: r.correctIndex,
+        selected_index: r.timedOut ? null : r.selectedIndex,
+        is_correct: r.correct,
+        is_timed_out: r.timedOut || false,
+        explanation: r.explanation || null,
+      }));
 
-    const { error: qErr } = await db.from("mcq_questions").insert(questionRows);
-    if (qErr) throw new Error(qErr.message);
-  }
+      const { error: qErr } = await db
+        .from("mcq_questions")
+        .insert(questionRows);
+      if (qErr) {
+        // Rollback: delete the parent row
+        await db.from("mcq_sessions").delete().eq("id", sessionRow.id);
+        throw new Error(`MCQ questions insert failed: ${qErr.message}`);
+      }
+    }
 
-  return sessionRow;
+    return sessionRow;
+  });
 }
 
 /**

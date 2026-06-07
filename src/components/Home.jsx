@@ -9,7 +9,13 @@ import { useToast } from "./ui/Toast";
 import UserMenu from "./auth/UserMenu";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
 
-export default function Home({ onStart, onHistory, onSettings }) {
+export default function Home({
+  onStart,
+  onHistory,
+  onSettings,
+  userRole,
+  extraNav,
+}) {
   const settings = loadSettings();
   const toast = useToast();
   const pastCount = loadAllSessions().length;
@@ -53,6 +59,7 @@ export default function Home({ onStart, onHistory, onSettings }) {
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-16">
         {/* Top bar */}
         <div className="flex justify-end gap-2 mb-6 animate-fade-in">
+          {userRole === "candidate" && extraNav}
           <button
             onClick={onHistory}
             className="flex items-center gap-2 text-sm font-mono text-muted

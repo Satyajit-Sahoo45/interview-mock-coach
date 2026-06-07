@@ -10,6 +10,7 @@ import { useToast } from "./ui/Toast";
 import { ROLES } from "../utils/prompts";
 import { loadSettings } from "../utils/storage";
 import { saveMCQSessionToDB } from "../utils/db";
+import useDB from "../hooks/useDB";
 
 function getApiModule() {
   const provider = loadSettings().provider || "gemini";
@@ -25,8 +26,9 @@ function getApiModule() {
 
 const TOTAL_QUESTIONS = 10;
 
-export default function MCQRoom({ config, onComplete, onExit, db, userId }) {
+export default function MCQRoom({ config, onComplete, onExit }) {
   const toast = useToast();
+  const { db, userId } = useDB();
 
   const [phase, setPhase] = useState("loading");
   const [currentQ, setCurrentQ] = useState(null);
@@ -157,6 +159,13 @@ export default function MCQRoom({ config, onComplete, onExit, db, userId }) {
           } finally {
             setSaving(false);
           }
+        } else {
+          // db not ready — this is why intermittent saves fail
+          console.warn("MCQ save skipped: db or userId not available", {
+            db: !!db,
+            userId,
+          });
+          toast.warn("Not signed in — quiz not saved to cloud.");
         }
         // -------- END SAVE ---------------
 

@@ -1,62 +1,79 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import Home from "./components/Home";
 import InterviewRoom from "./components/InterviewRoom";
 import SessionReport from "./components/SessionReport";
 import History from "./components/History";
-import { loadSettings, saveSession, saveSettings } from "./utils/storage";
 import Settings from "./components/Settings";
-import { ToastProvider } from "./components/ui/Toast";
 import CheatSheet from "./components/CheatSheet";
-import { saveSessionToDB, loadSettingsFromDB } from "./utils/db";
-import useDB from "./hooks/useDB";
-import { useAuth } from "@clerk/clerk-react";
-import SignInPage from "./components/auth/SignInPage";
 import MCQRoom from "./components/MCQRoom";
+import SignInPage from "./components/auth/SignInPage";
 
-export default function App() {
+// Recruiter screens
+import RoleSelector from "./components/recruiter/RoleSelector";
+import RecruiterDashboard from "./components/recruiter/RecruiterDashboard";
+import JobPostingForm from "./components/recruiter/JobPostingForm";
+
+// Candidate job screens
+import JobBoard from "./components/candidate/JobBoard";
+import JobInterviewRoom from "./components/candidate/JobInterviewRoom";
+import MyApplications from "./components/candidate/MyApplications";
+
+import { ToastProvider } from "./components/ui/Toast";
+import { loadSettings, saveSettings } from "./utils/storage";
+import { saveSessionToDB, loadSettingsFromDB } from "./utils/db";
+import { getUserRole } from "./utils/db-recruiter";
+import useDB from "./hooks/useDB";
+
+function AppInner() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { db, userId, loading: dbLoading } = useDB(); // authenticated DB client
+  const { user } = useUser();
+  const { db, userId, loading: dbLoading } = useDB();
 
-  // Screens: 'home' | 'interview' | 'report'
   const [screen, setScreen] = useState("home");
   const [config, setConfig] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [userRole, setUserRole] = useState(null); // 'candidate' | 'recruiter' | null
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [editingJob, setEditingJob] = useState(null); // job being edited
+  const [selectedJob, setSelectedJob] = useState(null); // job being applied to
 
-  // ── V3: Apply saved theme on every app load ─────────────────────────────
-  // Without this, refreshing the page would revert to dark even if the user
-  // had saved light in Settings.
+  // Apply theme on load
   useEffect(() => {
     const { theme } = loadSettings();
     document.documentElement.setAttribute("data-theme", theme || "dark");
   }, []);
 
-  // ── V4: When user signs in, pull their settings from Supabase ─────────────
-  // This syncs cloud settings → localStorage so the rest of the app
-  // (which reads from localStorage) gets the right values immediately.
+  // On sign-in: load settings + user role
   useEffect(() => {
     if (!db || !userId || dbLoading) return;
     (async () => {
       try {
+        // Load cloud settings
         const cloudSettings = await loadSettingsFromDB(db, userId);
         if (cloudSettings) {
-          // Cloud settings win — they're the source of truth for signed-in users
           saveSettings(cloudSettings);
           document.documentElement.setAttribute(
             "data-theme",
             cloudSettings.theme || "dark",
           );
-        } else {
-          console.warn("Could not load settings from DB:", e.message);
         }
+        // Load user role
+        const role = await getUserRole(db, userId);
+        setUserRole(role);
+        setScreen(role === "recruiter" ? "recruiter-dashboard" : "home");
       } catch (e) {
-        console.warn("Could not load settings from DB:", e.message);
+        console.warn("Init error:", e.message);
+        setUserRole("candidate"); // safe default
+      } finally {
+        setRoleLoading(false);
       }
     })();
   }, [db, userId, dbLoading]);
 
-  // ── Show loading spinner while Clerk initializes ───────────────────────────
-  if (!isLoaded) {
+  // Loading screen
+  if (!isLoaded || (isSignedIn && roleLoading)) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="dot-loader flex gap-2">
@@ -68,7 +85,7 @@ export default function App() {
     );
   }
 
-  // ── Show sign-in page if not authenticated ─────────────────────────────────
+  // Sign-in screen
   if (!isSignedIn) {
     return (
       <ToastProvider>
@@ -79,16 +96,29 @@ export default function App() {
     );
   }
 
+  // First-time role selection
+  if (!userRole || userRole === null) {
+    return (
+      <ToastProvider>
+        <div className="min-h-screen bg-bg text-text font-body">
+          <RoleSelector
+            onRoleSelected={(role) => {
+              setUserRole(role);
+              setScreen(role === "recruiter" ? "recruiter-dashboard" : "home");
+            }}
+          />
+        </div>
+      </ToastProvider>
+    );
+  }
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   const handleStart = (cfg) => {
     setConfig(cfg);
     setSessions([]);
     setSummary(null);
-    // route MCQ type directly to quiz, skip cheat sheet
-    if (cfg.type === "mcq") {
-      setScreen("mcq");
-    } else {
-      setScreen("cheatsheet");
-    }
+    setScreen(cfg.type === "mcq" ? "mcq" : "cheatsheet");
   };
 
   const handleStartInterview = () => setScreen("interview");
@@ -98,27 +128,35 @@ export default function App() {
     setSummary(sessionSummary);
 
     const { autoSave } = loadSettings();
-    if (autoSave && db && userId) {
-      try {
-        // ← V4: save to Supabase instead of (or in addition to) localStorage
-        await saveSessionToDB(db, {
+    const shouldSave = settings.autoSave !== false;
+
+    if (shouldSave) {
+      // check db is available right now (fresh from useDB)
+      if (db && userId) {
+        try {
+          await saveSessionToDB(db, {
+            userId,
+            config,
+            sessions: completedSessions,
+            summary: sessionSummary,
+          });
+          toast.success("✓ Session saved to your history!");
+        } catch (e) {
+          console.error("Session save error:", e);
+          toast.error(`Could not save session: ${e.message}`);
+        }
+      } else {
+        console.warn("Session save skipped: db not ready", {
+          db: !!db,
           userId,
-          config,
-          sessions: completedSessions,
-          summary: sessionSummary,
         });
-      } catch (e) {
-        console.warn("Could not save session to DB:", e.message);
-        // Graceful degradation — session still shows in report even if save fails
+        toast.warn("Not signed in — session not saved to cloud.");
       }
     }
     setScreen("report");
   };
 
-  //MCQ quiz finishes — go back home
-  const handleMCQComplete = () => {
-    setScreen("home");
-  };
+  const handleMCQComplete = () => setScreen("home");
 
   const handleRestart = () => {
     setScreen("home");
@@ -127,16 +165,67 @@ export default function App() {
     setSummary(null);
   };
 
+  // ── Recruiter handlers ────────────────────────────────────────────────────
+
+  const handleCreateJob = () => {
+    setEditingJob(null);
+    setScreen("recruiter-post-job");
+  };
+
+  const handleEditJob = (job) => {
+    setEditingJob(job);
+    setScreen("recruiter-edit-job");
+  };
+
+  const handleJobSaved = () => {
+    setEditingJob(null);
+    setScreen("recruiter-dashboard");
+  };
+
+  // ── Candidate job handlers ────────────────────────────────────────────────
+
+  const handleApplyToJob = (job) => {
+    setSelectedJob(job);
+    setScreen("job-interview");
+  };
+
+  const handleJobInterviewComplete = () => {
+    setSelectedJob(null);
+    setScreen("my-applications");
+  };
+
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-bg text-text font-body">
+      <div className="min-h-screen bg-bg text-text font-body transition-colors duration-300">
         {screen === "home" && (
           <Home
             onStart={handleStart}
             onHistory={() => setScreen("history")}
             onSettings={() => setScreen("settings")}
+            userRole={userRole}
+            extraNav={
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setScreen("job-board")}
+                  className="flex items-center gap-1.5 text-sm font-mono text-muted
+                    hover:text-accent transition-colors border border-border
+                    hover:border-accent/40 px-3 py-1.5 rounded-lg bg-card/50"
+                >
+                  💼 Jobs
+                </button>
+                <button
+                  onClick={() => setScreen("my-applications")}
+                  className="flex items-center gap-1.5 text-sm font-mono text-muted
+                    hover:text-text transition-colors border border-border
+                    hover:border-border-light px-3 py-1.5 rounded-lg bg-card/50"
+                >
+                  📋 My Applications
+                </button>
+              </div>
+            }
           />
         )}
+
         {screen === "cheatsheet" && config && (
           <CheatSheet
             config={config}
@@ -149,10 +238,9 @@ export default function App() {
             config={config}
             onComplete={handleMCQComplete}
             onExit={handleRestart}
-            db={db}
-            userId={userId}
           />
         )}
+
         {screen === "interview" && config && (
           <InterviewRoom
             config={config}
@@ -170,15 +258,57 @@ export default function App() {
           />
         )}
         {screen === "history" && <History onBack={() => setScreen("home")} />}
-        {screen === "settings" && (
-          <Settings
-            onBack={() => setScreen("home")} // V3: when Settings saves a new theme, re-apply it immediately
-            onThemeChange={(theme) => {
-              document.documentElement.setAttribute("data-theme", theme);
-            }}
+        {screen === "settings" && <Settings onBack={() => setScreen("home")} />}
+
+        {/* ── Job board (candidates) ── */}
+        {screen === "job-board" && (
+          <JobBoard
+            onApply={handleApplyToJob}
+            onBack={() => setScreen("home")}
+          />
+        )}
+
+        {screen === "job-interview" && selectedJob && (
+          <JobInterviewRoom
+            job={selectedJob}
+            onComplete={handleJobInterviewComplete}
+            onExit={() => setScreen("job-board")}
+          />
+        )}
+
+        {screen === "my-applications" && (
+          <MyApplications
+            onBack={() => setScreen("home")}
+            onBrowseJobs={() => setScreen("job-board")}
+          />
+        )}
+
+        {/* ── Recruiter screens ── */}
+        {screen === "recruiter-dashboard" && (
+          <RecruiterDashboard
+            onCreateJob={handleCreateJob}
+            onEditJob={handleEditJob}
+            onViewCandidates={() => {}} // handled inside RecruiterDashboard
+          />
+        )}
+
+        {(screen === "recruiter-post-job" ||
+          screen === "recruiter-edit-job") && (
+          <JobPostingForm
+            existingJob={editingJob}
+            onSaved={handleJobSaved}
+            onBack={() => setScreen("recruiter-dashboard")}
           />
         )}
       </div>
+    </ToastProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
     </ToastProvider>
   );
 }

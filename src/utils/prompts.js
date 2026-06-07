@@ -259,7 +259,7 @@ Respond ONLY with valid JSON — no markdown, no code fences:
 }
 `;
 
-// ─── MCQ Summary prompt (NEW) ─────────────────────────────────────────────────
+// ─── MCQ Summary prompt ─────────────────────────────────────────────────
 
 export const buildMCQSummaryPrompt = (results, role, difficulty) => `
 You are an expert career coach reviewing a completed MCQ quiz.
@@ -284,5 +284,88 @@ Respond ONLY with valid JSON — no markdown, no code fences:
   "weakAreas":      ["<topic to study>"],
   "studyTopics":    ["<specific thing to read up on 1>", "<specific thing 2>", "<specific thing 3>"],
   "motivationalNote": "<1-2 sentence personalised message>"
+}
+`;
+
+export const buildJobEvaluationPrompt = (
+  question,
+  idealAnswer,
+  candidateAnswer,
+  role,
+  difficulty,
+) => `
+You are evaluating a ${difficulty}-level ${role} candidate for a job interview.
+ 
+Question: "${question}"
+${idealAnswer ? `What a great answer should cover:\n"${idealAnswer}"` : ""}
+Candidate's answer: "${candidateAnswer}"
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "score":          <integer 1–10>,
+  "rating":         "<Excellent | Good | Average | Needs Work>",
+  "strengths":      ["<strength 1>", "<strength 2>"],
+  "gaps":           ["<gap 1>", "<gap 2>"],
+  "missedPoints":   ["<point they missed>"],
+  "improvedAnswer": "<Better version in 2-3 sentences>"
+}
+`;
+
+export const buildJobSummaryPrompt = (
+  answers,
+  role,
+  jobTitle,
+  passThreshold,
+) => `
+You are a hiring manager reviewing a completed job interview for: "${jobTitle}" (${role}).
+Pass threshold: ${passThreshold}/10.
+ 
+Results:
+${answers
+  .map(
+    (a, i) =>
+      `Q${i + 1}: ${a.question}\nAnswer: ${a.answer}\nScore: ${a.feedback?.score ?? "N/A"}/10`,
+  )
+  .join("\n\n")}
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "overallScore":   <average score, one decimal>,
+  "passed":         <true if average >= ${passThreshold}>,
+  "hiringVerdict":  "<Strong Hire | Hire | Maybe | No Hire>",
+  "topStrengths":   ["<strength 1>", "<strength 2>"],
+  "concerns":       ["<concern 1>", "<concern 2>"],
+  "recommendation": "<2-3 sentence hiring recommendation>"
+}
+`;
+
+export const buildAutoQuestionsPrompt = (
+  jobTitle,
+  role,
+  difficulty,
+  jobDescription,
+  count = 5,
+) => `
+You are an expert technical recruiter creating interview questions for: "${jobTitle}".
+Role: ${role} | Level: ${difficulty}
+ 
+Job description:
+"""
+${jobDescription?.slice(0, 1000) || "Not provided"}
+"""
+ 
+Generate exactly ${count} interview questions tailored to this specific job.
+Mix behavioral and technical questions relevant to the role.
+ 
+Respond ONLY with valid JSON — no markdown, no code fences:
+{
+  "questions": [
+    {
+      "question_text": "<the question>",
+      "question_type": "open",
+      "ideal_answer":  "<what a great answer covers — 2-3 sentences>",
+      "weight":        <1-3>
+    }
+  ]
 }
 `;
